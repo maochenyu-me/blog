@@ -1,7 +1,8 @@
 name: Deploy to Cloudflare Pages
 
 # 纯静态部署：pnpm generate 产出静态文件（.output/public），用 wrangler pages deploy 推送到 Cloudflare Pages。
-# 若目标 Pages 项目尚不存在，工作流会自动创建（project create），因此无需在 CF 面板预建项目。
+# 若目标 Pages 项目尚不存在，会自动创建（pages project create，幂等）；其余真实错误会直接显示并中断，
+# 避免被 continue-on-error 吞掉而难以排查。
 on:
   push:
     branches: [main]
@@ -14,7 +15,6 @@ on:
   # 手动触发：仓库 → Actions → 选本工作流 → Run workflow
   workflow_dispatch:
 
-# 同一时间只允许一个部署在跑，避免并发部署互相覆盖
 concurrency:
   group: deploy-cloudflare-pages
   cancel-in-progress: false
@@ -25,6 +25,7 @@ permissions:
 env:
   # Pages 项目名，可用仓库级 Variable（CF_PAGES_PROJECT_NAME）覆盖，未设置时用默认名
   CF_PAGES_PROJECT_NAME: ${{ vars.CF_PAGES_PROJECT_NAME || 'maochenyu-blog' }}
+  WRANGLER_VERSION: 'latest'
 
 jobs:
   build-and-deploy:
@@ -42,7 +43,6 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # 与 package.json engines 匹配
           node-version: 24
           cache: pnpm
 
@@ -60,18 +60,34 @@ jobs:
           fi
           du -sh .output/public
 
-      # 目标 Pages 项目不存在时自动创建；若已存在会报错，这里忽略即可（continue-on-error）
-      - name: Create Cloudflare Pages project (if missing)
-        uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages project create ${{ env.CF_PAGES_PROJECT_NAME }} --production-branch=main
+      # 使用 wrangler 直接命令：先幂等创建项目（忽略“已存在”），再部署。
+      # 任何非“已存在”的错误都会打印完整 stderr 并中断，便于排查 token/权限/名称问题。
+      - name: Deploy to Cloudflare Pages (auto-create project)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy .output/public --project-name=${{ env.CF_PAGES_PROJECT_NAME }} --branch=${{ github.ref_name }} --commit-dirty=true
+          echo "::group::Ensure Pages project"
+          set +e
+          create_out=$(pnpm dlx wrangler@${{ env.WRANGLER_VERSION }} pages project create "$CF_PAGES_PROJECT_NAME" --production-branch=main 2>&1)
+          create_code=$?
+          set -e
+          printf '%s\n' "$create_out"
+          if [ "$create_code" -ne 0 ]; then
+            if printf '%s' "$create_out" | grep -qiE "already exists|a project .* already exists|same name"; then
+              echo "::notice::Pages project '$CF_PAGES_PROJECT_NAME' already exists, skip creation."
+            else
+              echo "::error::Pages project 创建失败，详见上方输出。请检查 CLOUDFLARE_API_TOKEN 是否含 Pages:Edit 权限。"
+              exit "$create_code"
+            fi
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Deploy"
+          pnpm dlx wrangler@${{ env.WRANGLER_VERSION }} pages deploy .output/public \
+            --project-name="$CF_PAGES_PROJECT_NAME" \
+            --branch="${GITHUB_REF_NAME:-main}" \
+            --commit-dirty=true
+          echo "::endgroup::"
