@@ -27,14 +27,13 @@ export default defineNuxtConfig({
 			link: [
 				{ rel: 'icon', href: blogConfig.favicon },
 				{ rel: 'alternate', type: 'application/atom+xml', href: '/atom.xml' },
-				{ rel: 'preconnect', href: blogConfig.twikoo.preload },
+				// Twikoo 未配置（preload 为空）时不输出 preconnect，否则会产生空 href 的 link 标签
+				...(blogConfig.twikoo.preload ? [{ rel: 'preconnect', href: blogConfig.twikoo.preload }] : []),
 				{ rel: 'stylesheet', href: 'https://s4.zstatic.net/npm/katex@0.16.44/dist/katex.min.css' },
 				// "InterVariable", "Inter"
 				{ rel: 'stylesheet', href: 'https://s4.zstatic.net/npm/inter-ui@4.1.1/inter-variable.css' },
 				{ rel: 'stylesheet', href: 'https://s4.zstatic.net/npm/inter-ui@4.1.1/inter.css' },
-				// "JetBrains Mono", 思源宋体 "Noto Serif SC"
-				{ rel: 'preconnect', href: 'https://fonts.gstatic.cn', crossorigin: '' },
-				{ rel: 'stylesheet', href: 'https://fonts.googleapis.cn/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Noto+Serif+SC:wght@200..900&display=swap' },
+				// 已自托管于 /fonts/zhuque (朱雀仿宋) 与 /fonts/jetbrains-mono (JetBrains Mono)，不再从 googleapis.cn 加载
 				// 抖音美好体 "DOUYINSANSBOLD-GB"
 				{ rel: 'stylesheet', href: 'https://fonts.bytedance.com/dfd/api/v1/css?family=DOUYINSANSBOLD-GB&display=swap' },
 			],
@@ -228,6 +227,8 @@ ${packageJson.homepage}
 		format: ['avif', 'webp'],
 		// Neylify 下 netlify 处理器无法显示站外图片，ipx 处理器无法显示站内图片，需彻底禁用
 		// https://github.com/nuxt/image/issues/1353
+		// 注：Cloudflare Pages 静态部署( pnpm generate / static preset )无需此处禁用——
+		// @nuxt/image 会自动选择 ipxStatic provider，构建期把优化图写入 .output/public/_ipx/。
 		provider: NETLIFY ? 'none' : undefined,
 	},
 
