@@ -21,7 +21,11 @@ const channelLabel = computed(() => {
 const verifiedTip = '这个说说来自博客作者本人的 Telegram 频道'
 
 /** 头像优先取说说专属配置，留空时用站点作者头像 */
-const avatar = computed(() => appConfig.memos.avatar || appConfig.author.avatar)
+const avatar = computed(() => {
+	const src = appConfig.memos.avatar || appConfig.author.avatar
+	// 配置里可能写成 `./img/...`，补成站点绝对路径，避免相对当前路由解析
+	return src.startsWith('./') ? `/${src.slice(2)}` : src
+})
 /** 昵称同上：留空时用站点作者名 */
 const nickname = computed(() => appConfig.memos.nickname || appConfig.author.name)
 
@@ -49,13 +53,19 @@ async function onReply() {
 <template>
 <article class="memos-card">
 	<header class="memos-meta">
-		<NuxtImg
+		<!--
+			用原生 img 而非 NuxtImg：卡片是客户端渲染的，构建期 prerender 的 HTML 里没有它，
+			ipxStatic 不会生成 44×44 变体，静态托管下 /_ipx/s_44x44/... 会 404
+		-->
+		<img
 			class="avatar round-cobblestone"
 			:src="avatar"
 			:alt="nickname"
 			width="44"
 			height="44"
-		/>
+			loading="lazy"
+			decoding="async"
+		>
 
 		<div class="info">
 			<div class="nick">

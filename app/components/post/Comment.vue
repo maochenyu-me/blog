@@ -71,6 +71,9 @@ const ecokuMount = useTemplateRef('ecoku-mount')
 let ecoku: Ecoku | null = null
 let unmounted = false
 
+/** 骨架屏与真实卡片同高，挂载完成（或失败交给 Ecoku 自己的错误态）后撤掉 */
+const loading = ref(true)
+
 onMounted(async () => {
 	if (provider.value === 'twikoo') {
 		window.twikoo?.init?.({
@@ -81,13 +84,17 @@ onMounted(async () => {
 		return
 	}
 
-	if (provider.value !== 'ecoku')
+	if (provider.value !== 'ecoku') {
+		loading.value = false
 		return
+	}
 
 	// 按需加载 SDK：只有启用 Ecoku 的文章页会下载这段客户端代码
 	const { default: EcokuClient } = await import('ecoku')
-	if (unmounted || !ecokuMount.value)
+	if (unmounted || !ecokuMount.value) {
+		loading.value = false
 		return
+	}
 
 	const { serverURL, siteId, pageSize, i18n } = appConfig.comment.ecoku
 	const instance = new EcokuClient({
@@ -110,6 +117,10 @@ onMounted(async () => {
 	catch (error) {
 		console.error('[Ecoku] 初始化失败', error)
 		return
+	}
+	finally {
+		// 失败时 Ecoku 会渲染自己的「评论暂时不可用」错误态，骨架同样要撤
+		loading.value = false
 	}
 
 	// init 期间路由可能已经切换，补一次 setPageKey，否则评论区还停在上一篇文章
@@ -135,7 +146,13 @@ function logPageKeyError(error: unknown) {
 </script>
 
 <template>
-<section v-if="provider !== 'none'" id="comments" ref="comment" class="z-comment">
+<section
+	v-if="provider !== 'none'"
+	id="comments"
+	ref="comment"
+	class="z-comment"
+	:aria-busy="provider === 'ecoku' && loading"
+>
 	<h3 class="text-creative">
 		评论区
 	</h3>
@@ -178,9 +195,38 @@ function logPageKeyError(error: unknown) {
 		</template>
 	</Tooltip>
 
-	<div v-if="provider === 'ecoku'" ref="ecoku-mount" class="ecoku-mount">
-		<p>评论加载中...</p>
-	</div>
+	<template v-if="provider === 'ecoku'">
+		<!-- 骨架与真实评论区叠在一格里：骨架按真实卡片尺寸占位，加载完直接切换不位移 -->
+		<div class="ecoku-body">
+			<div
+				v-if="loading"
+				class="ecoku-skeleton"
+				aria-hidden="true"
+			>
+				<div class="sk-fields">
+					<i /><i /><i />
+				</div>
+				<div class="sk-lines">
+					<i /><i /><i />
+				</div>
+				<div class="sk-bottom">
+					<i class="sk-captcha" />
+					<div class="sk-actions">
+						<i /><i /><i />
+					</div>
+				</div>
+			</div>
+			<p v-if="loading" class="sr-only">
+				评论加载中…
+			</p>
+			<div
+				ref="ecoku-mount"
+				class="ecoku-mount"
+				:class="{ 'is-pending': loading }"
+				:inert="loading"
+			/>
+		</div>
+	</template>
 
 	<div v-else id="twikoo">
 		<p>评论加载中...</p>
@@ -221,9 +267,149 @@ function logPageKeyError(error: unknown) {
 	}
 }
 
-/* 首屏占位高度，避免评论挂载时把页脚顶下去 */
+/* 无障碍：仅屏幕阅读器可见 */
+.sr-only {
+	position: absolute;
+	overflow: hidden;
+	width: 1px;
+	height: 1px;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+/* 骨架与真实评论区共用一个格子，交叉淡入 */
+.ecoku-body {
+	display: grid;
+}
+
+.ecoku-body > * {
+	grid-area: 1 / 1;
+	min-width: 0;
+}
+
+/* 加载骨架：按真实发布卡片的实测尺寸占位（composer 191.7px：字段 32 + 输入 98 + 底行 58） */
+.ecoku-skeleton {
+	display: grid;
+	align-self: start;
+	gap: 6px 12px;
+	padding: 8px 14px 10px;
+	border: 1px solid var(--c-border);
+	border-radius: 0.5em;
+	box-shadow: var(--box-shadow-1);
+	box-sizing: border-box;
+	background: var(--ld-bg-card);
+}
+
+.ecoku-skeleton *,
+.ecoku-skeleton *::before,
+.ecoku-skeleton *::after {
+	box-sizing: border-box;
+}
+
+/* 加载期先占位但不绘制：用 visibility 而不是 opacity 过渡，
+   后台标签页里 CSS 过渡可能被冻结在起点，opacity 会永久停在 0 */
 .ecoku-mount {
-	min-height: 12rem;
+	align-self: start;
+
+	&.is-pending {
+		visibility: hidden;
+	}
+}
+
+.ecoku-skeleton i {
+	display: block;
+	position: relative;
+	overflow: hidden;
+	border-radius: 0.4em;
+	background: var(--c-bg-soft);
+}
+
+/* 一道扫光，比整体闪烁更安静 */
+.ecoku-skeleton i::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(90deg, transparent, var(--c-bg-a50), transparent);
+	transform: translateX(-100%);
+	animation: ecoku-skeleton-sheen 1.5s ease-in-out infinite;
+}
+
+.sk-fields {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.sk-fields i {
+	height: 32px;
+}
+
+.sk-lines {
+	display: grid;
+	align-content: start;
+	gap: 12px;
+	/* 与真实 textarea（96px + 2px 内边距）等高 */
+	min-height: 98px;
+	padding-top: 12px;
+}
+
+.sk-lines i {
+	height: 0.75em;
+
+	&:nth-child(2) {
+		width: 84%;
+	}
+
+	&:nth-child(3) {
+		width: 54%;
+	}
+}
+
+.sk-bottom {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 12px;
+}
+
+.sk-captcha {
+	width: min(100%, 260px);
+	height: 58px;
+	border-radius: 0.5em;
+}
+
+.sk-actions {
+	display: flex;
+	gap: 4px;
+}
+
+.sk-actions i {
+	width: 56px;
+	height: 32px;
+	border-radius: 0.5em;
+}
+
+@media (max-width: 620px) {
+	.sk-fields,
+	.sk-bottom {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.sk-actions {
+		justify-content: flex-end;
+	}
+}
+
+@keyframes ecoku-skeleton-sheen {
+	to {
+		transform: translateX(100%);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ecoku-skeleton i::after {
+		animation: none;
+	}
 }
 
 /* Ecoku：把默认的「纸墨」配色整体换成主题令牌，明暗模式随 --c-* 自动切换 */
@@ -259,13 +445,140 @@ function logPageKeyError(error: unknown) {
 	margin-inline: 0;
 }
 
-:deep(.ecoku-section-title) {
+/* —— 版式：压掉 Ecoku 默认过大的留白，密度贴近主题正文 —— */
+
+/* 空评论区不再预留 360px */
+:deep(.ecoku-mount .ecoku-comment-section) {
+	min-height: 0;
+}
+
+/* 「N 条评论」标题行：上方 44px 的死空收窄 */
+:deep(.ecoku-mount .ecoku-section-heading) {
+	min-height: 28px;
+	margin: 1.25rem 0 0.25rem;
+}
+
+/* 空状态：默认 20/24px 外边距 + 三行散字，收紧成一段灰字 */
+:deep(.ecoku-mount .ecoku-empty-state) {
+	margin: 0.5rem 0 0;
+	font-size: 0.9375rem;
+	line-height: 1.7;
+}
+
+:deep(.ecoku-mount .ecoku-section-title) {
 	font-family: var(--font-creative);
+	font-size: 1.125rem;
+	line-height: 1.75;
+}
+
+/* 发布卡片：贴合主题 .card 的圆角 + 一级阴影，并把 Cap 验证与按钮并排以压低高度 */
+:deep(.ecoku-mount .ecoku-composer) {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 6px 12px;
+	padding: 8px 14px 10px;
+	box-shadow: var(--box-shadow-1);
+	transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+/* 整行铺满的区块 */
+:deep(.ecoku-mount .ecoku-identity-grid),
+:deep(.ecoku-mount .ecoku-message-field),
+:deep(.ecoku-mount .ecoku-composer-preview),
+:deep(.ecoku-mount .ecoku-form-error) {
+	grid-column: 1 / -1;
+}
+
+/* 原来的独立外边距交给 grid 的 gap */
+:deep(.ecoku-mount .ecoku-composer-preview),
+:deep(.ecoku-mount .ecoku-form-error) {
+	margin-block: 0;
+}
+
+:deep(.ecoku-mount .ecoku-turnstile-slot) {
+	grid-column: 1;
+	margin-block: 0;
+}
+
+:deep(.ecoku-mount .ecoku-composer-footer) {
+	grid-column: 2;
+	margin-block: 0;
+}
+
+@media (max-width: 620px) {
+	:deep(.ecoku-mount .ecoku-composer) {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	:deep(.ecoku-mount .ecoku-turnstile-slot),
+	:deep(.ecoku-mount .ecoku-composer-footer) {
+		grid-column: 1 / -1;
+	}
+}
+
+:deep(.ecoku-mount .ecoku-composer:focus-within) {
+	box-shadow: var(--box-shadow-2);
+}
+
+/* 昵称/邮箱/网址：三条孤立的下划线 → 三个内嵌输入槽 */
+:deep(.ecoku-mount .ecoku-identity-grid) {
+	/* 窄屏会叠成单列，留出行距，避免三个槽粘成一整块 */
+	gap: 6px 16px;
+}
+
+:deep(.ecoku-mount .ecoku-field) {
+	padding: 0 0.55em;
+	border: 1px solid transparent;
+	border-radius: 0.4em;
+	background: var(--c-bg-soft);
+	transition: border-color 0.15s;
+}
+
+:deep(.ecoku-mount .ecoku-field:focus-within) {
+	border-color: var(--c-primary);
+}
+
+:deep(.ecoku-mount .ecoku-field:has(.ecoku-input[aria-invalid="true"])) {
+	border-color: var(--ecoku-danger);
+}
+
+:deep(.ecoku-mount .ecoku-field-label) {
+	line-height: 30px;
+}
+
+:deep(.ecoku-mount .ecoku-input) {
+	height: 30px;
+	font-size: 0.9em;
+}
+
+/* 正文输入区：7 行 → 3 行，仍可手动拉高 */
+:deep(.ecoku-mount .ecoku-textarea) {
+	height: calc(1.75em * 3 + 12px);
+	min-height: calc(1.75em * 3);
+	padding: 10px 0 2px;
+}
+
+/* 表情 / 预览 等次级按钮：主题 .button 的细边 + 一级阴影 */
+:deep(.ecoku-mount .ecoku-secondary-button),
+:deep(.ecoku-mount .ecoku-smoji-trigger) {
+	border-color: var(--c-bg-soft);
+	box-shadow: var(--box-shadow-1);
+	background: var(--ld-bg-card);
+	color: var(--c-text-2);
+	transition: color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+
+:deep(.ecoku-mount .ecoku-secondary-button:not(:disabled):hover),
+:deep(.ecoku-mount .ecoku-smoji-trigger:not(:disabled):hover) {
+	box-shadow: var(--box-shadow-2);
+	color: var(--c-text);
 }
 
 /* 主按钮跟主题的 .button.primary 一致：品牌色底 + 页面底色文字 */
 :deep(.ecoku-primary-button) {
 	border-color: var(--c-primary);
+	box-shadow: var(--box-shadow-1);
 	background: var(--c-primary);
 	color: var(--c-bg);
 }

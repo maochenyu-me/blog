@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { myFeed } from '~~/blog.config'
+import blogConfig, { myFeed } from '~~/blog.config'
 import feeds from '~/feeds'
 
 const appConfig = useAppConfig()
@@ -15,12 +15,17 @@ useSeoMeta({
 	description: `${appConfig.title}的友链页面，收集了添加他为友链的网站和他订阅的网站列表。`,
 })
 
+/** 站内相对路径（如 ./img/avatar/avatar.webp）补成绝对地址，访客复制过去才能直接访问 */
+function toAbsoluteUrl(path: string): string {
+	return new URL(path, blogConfig.url).toString()
+}
+
 const copyFields = {
 	博主: myFeed.author,
 	标题: myFeed.title,
 	介绍: myFeed.desc,
 	网址: myFeed.link,
-	头像: myFeed.avatar,
+	头像: toAbsoluteUrl(myFeed.avatar),
 }
 </script>
 
