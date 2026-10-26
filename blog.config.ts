@@ -175,6 +175,13 @@ const blogConfig = {
 		 * 太短的超时会在链路抖动时误判为加载失败，可酌情放宽
 		 */
 		requestTimeout: 15 * 1000,
+		/**
+		 * 说说卡片上展示的头像，图片建议放在 public/img/avatar/ 下并填站点路径。
+		 * 留空则回退到 `author.avatar`，适合说说与站点主头像不一致的情况
+		 */
+		avatar: '',
+		/** 说说卡片上展示的昵称，留空则回退到 `author.name` */
+		nickname: '',
 		/** 页面顶部头图卡片，image 留空时使用主题色渐变兜底 */
 		banner: {
 			/** 图片放在 public/img/banner/ 下，这里填站点路径如 `/img/banner/2.jpg`（宽高比约 3:1） */

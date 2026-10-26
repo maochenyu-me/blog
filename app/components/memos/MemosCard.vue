@@ -20,6 +20,11 @@ const channelLabel = computed(() => {
 
 const verifiedTip = '这个说说来自博客作者本人的 Telegram 频道'
 
+/** 头像优先取说说专属配置，留空时用站点作者头像 */
+const avatar = computed(() => appConfig.memos.avatar || appConfig.author.avatar)
+/** 昵称同上：留空时用站点作者名 */
+const nickname = computed(() => appConfig.memos.nickname || appConfig.author.name)
+
 /** 评论区是否启用，未启用时不必显示按钮 */
 const commentEnabled = computed(() => useAppConfig().comment.provider !== 'none')
 
@@ -46,15 +51,15 @@ async function onReply() {
 	<header class="memos-meta">
 		<NuxtImg
 			class="avatar round-cobblestone"
-			:src="appConfig.author.avatar"
-			:alt="appConfig.author.name"
+			:src="avatar"
+			:alt="nickname"
 			width="44"
 			height="44"
 		/>
 
 		<div class="info">
 			<div class="nick">
-				<span class="name">{{ appConfig.author.name }}</span>
+				<span class="name" v-text="nickname" />
 				<Icon
 					v-tip="verifiedTip"
 					class="verified"
