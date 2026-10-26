@@ -1,0 +1,135 @@
+name: Issue 事件 · 友链申请与赞助登记
+
+# 所有「issue 本身变化」的处理都放在这一个文件里：open / close / label / reopen。
+# 为什么合并：GitHub 每订阅一个事件就会产生一条 run，即使所有 job 的 if 都不满足也会留一条空记录。
+# 把同一类事件收进一个文件后，一次 issue 操作只会出现一条 run，其余无关 job 显示为 Skipped。
+#
+# 四个 job 各自靠 label 分流，互不干扰：
+# - 友链申请：opened → 预检；closed → 出条目/驳回/收录文案；labeled·reopened → 失联/无效通知
+# - 赞助登记：closed → 待审核摘要（写入动作在 issue-comment.yml，需要人工下指令）
+on:
+  issues:
+    types: [opened, closed, labeled, reopened]
+
+jobs:
+  link-preflight:
+    if: >-
+      github.event.action == 'opened' &&
+      contains(github.event.issue.labels.*.name, '友链申请') &&
+      github.event.issue.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: link-preflight-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test link scripts
+        run: node --test "scripts/link-apply/*.test.ts"
+
+      - name: Comment preflight report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/link-apply/comment-preflight.ts
+
+  link-entry:
+    if: >-
+      github.event.action == 'closed' &&
+      contains(github.event.issue.labels.*.name, '友链申请')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: link-apply-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test link scripts
+        run: node --test "scripts/link-apply/*.test.ts"
+
+      - name: Comment entry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/link-apply/comment-closed.ts
+
+  link-review:
+    # reopened 事件没有 label.name，只能靠 issue.labels 判断；两个标签同时存在时脚本里「无效」优先
+    if: >-
+      (github.event.action == 'labeled' || github.event.action == 'reopened') &&
+      github.event.issue.state == 'open' &&
+      contains(github.event.issue.labels.*.name, '友链申请') &&
+      (contains(github.event.issue.labels.*.name, '失联') ||
+      contains(github.event.issue.labels.*.name, '无效'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: link-review-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test link scripts
+        run: node --test "scripts/link-apply/*.test.ts"
+
+      - name: Comment review result
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/link-apply/comment-review.ts
+
+  reward-summary:
+    if: >-
+      github.event.action == 'closed' &&
+      contains(github.event.issue.labels.*.name, '赞助') &&
+      github.event.issue.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: reward-summary-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test reward scripts
+        run: node --test "scripts/reward-apply/*.test.ts"
+
+      - name: Comment summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/reward-apply/comment-summary.ts

@@ -1,23 +1,18 @@
-name: 赞助登记 · 管理员审核写入
+name: Issue 评论 · 赞助写入 main
 
 # 只有仓库 OWNER / MEMBER / COLLABORATOR 在带「赞助」标签的 issue 下回复「加入赞助名单」，
-# 才会把这条记录写进 app/reward.ts 并推送 main。这是整条链路唯一的写权限闸门。
+# 才会把记录写进 app/reward.ts 并推送 main —— 这是整条链路唯一的写权限闸门。
+#
+# 单独一个文件订阅 issue_comment：评论事件只命中这里，不会把 issue 事件的工作流也带起来，
+# 所以每次评论只会产生一条 run（其它 issue 的评论则是一条 Skipped，成本为零）。
 on:
   issue_comment:
     types: [created]
 
-concurrency:
-  group: reward-review-${{ github.event.issue.number }}
-  cancel-in-progress: false
-
-permissions:
-  contents: write
-  issues: write
-
 jobs:
-  apply:
+  reward-apply:
     # 四个条件缺一不可：
-    # 1. 只认带「赞助」标签的 issue（其它 issue 的评论连 runner 都不启动）
+    # 1. 只认带「赞助」标签的 issue（其它 issue 的评论连 job 都不启动）
     # 2. issue_comment 对 PR 评论同样会触发，必须排除
     # 3. 只认仓库成员；机器人自己的评论也排除（换 PAT 时才不会自触发）
     # 4. 关键词命中
@@ -33,6 +28,9 @@ jobs:
     concurrency:
       group: reward-apply-commit
       cancel-in-progress: false
+    permissions:
+      contents: write
+      issues: write
     outputs:
       status: ${{ steps.apply.outputs.status }}
       pushed: ${{ steps.push.outputs.pushed }}
@@ -101,8 +99,8 @@ jobs:
 
   # 复用现成的部署工作流：GITHUB_TOKEN 的 push 不会触发 push 事件，必须显式调用
   deploy:
-    needs: apply
-    if: needs.apply.outputs.pushed == '1'
+    needs: reward-apply
+    if: needs.reward-apply.outputs.pushed == '1'
     uses: ./.github/workflows/deploy-cloudflare-pages.yml
     secrets: inherit
     permissions:
