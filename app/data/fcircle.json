@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-24T05:49:45.115Z",
+  "generatedAt": "2026-10-26T22:08:11.644Z",
   "sites": [
     {
       "id": "blog.zhilu.site",
@@ -24,7 +24,79 @@
           "cover": "https://assets.zhilu.cyou/cover5/but-right.webp"
         }
       ],
-      "fetchedAt": "2026-10-24T05:49:45.115Z"
+      "fetchedAt": "2026-10-26T22:08:11.644Z"
+    },
+    {
+      "id": "blog.liushen.fun",
+      "name": "清羽飞扬",
+      "link": "https://blog.liushen.fun/",
+      "avatar": "https://blog.liushen.fun/info/avatar.ico",
+      "icon": "https://blog.liushen.fun/info/avatar.ico",
+      "feed": "https://blog.liushen.fun/atom.xml",
+      "status": "ok",
+      "items": [
+        {
+          "title": "近期开发的四个开源项目",
+          "link": "https://blog.liushen.fun/posts/6a6de263/",
+          "excerpt": "这里是清羽AI，这篇文章介绍了站长清羽飞扬近期维护与开发的四个开源项目。首先是对Artalk评论系统的增强，新增了AI内容审核、关键词拦截、AI评论助手及重构后的管理后台，在保留接口兼容的同时提升了反垃圾与互动能力。其次是Memora相册项目，基于Chronoframe重构为Go…",
+          "date": "2026-09-08T18:12:00.000Z"
+        },
+        {
+          "title": "AxonHub - 多模型API智能路由网关",
+          "link": "https://blog.liushen.fun/posts/b404081c/",
+          "excerpt": "这里是清羽AI，这篇文章记录了站长清羽飞扬近期的工作动态与技术探索。作者首先介绍了自主开发的清羽认证系统，该项目用于替代原有的Casdoor方案，实现了用户无感迁移与多种登录方式。文章主体部分详细对比了NewAPI、Sub2API、MetaPI等多款AI API聚合中转工具，最终…",
+          "date": "2026-08-06T17:12:00.000Z"
+        },
+        {
+          "title": "Cloudflare/Vercel项目推荐(6)",
+          "link": "https://blog.liushen.fun/posts/e4a369fc/",
+          "excerpt": "这里是清羽AI，这篇文章是 Cloudflare/Vercel 项目推荐系列第六期，推荐了 edgeever、EdgeMirror、edgeone-status、nodewarden、MiSub 和 How-To-Ask-Questions-The-Smart-Way 六个项目。…",
+          "date": "2026-07-12T16:12:00.000Z"
+        },
+        {
+          "title": "vibe-coding个人实践",
+          "link": "https://blog.liushen.fun/posts/67261b47/",
+          "excerpt": "这里是清羽AI，这篇文章记录了站长清羽飞扬在博客重构间隙对Vibe Coding的深度实践与经验总结。作者详细对比了Anthropic、OpenAI、智谱、月之暗面及MiniMax等国内外主流AI模型的编码能力与价格策略，并分享了自用的API中转站资源。文章重点介绍了Claude…",
+          "date": "2026-06-14T17:00:00.000Z"
+        },
+        {
+          "title": "建站四年，从Hexo换到Astro",
+          "link": "https://blog.liushen.fun/posts/acf06c11/",
+          "excerpt": "这里是清羽AI，这篇文章记录了站长清羽飞扬将博客从Hexo框架迁移至Astro的完整重构历程。作者回顾了因Hexo构建速度缓慢、性能受限而寻求新框架的过程，在对比Hugo、NextJS等方案后最终选择Astro，并借助AI工具大幅缩短开发周期。文章重点介绍了迁移过程中保持原有链接…",
+          "date": "2026-05-31T18:10:21.000Z"
+        },
+        {
+          "title": "黔山赴夏，清风入怀",
+          "link": "https://blog.liushen.fun/posts/1968ba6c/",
+          "excerpt": "这里是清羽AI，这篇文章记录了博主清羽飞扬近期的生活与工作动态。作者此前沉迷AI模型一个月，并为开源兰空图床添加了Oauth登录、前端Token生成及权限管理等功能。四月上旬，作者前往贵州贵阳贵安新区云上屯参加华为为期两周的培训，期间体验了无交付压力的轻松工作状态。培训之余，他与…",
+          "date": "2026-05-04T12:50:21.000Z"
+        },
+        {
+          "title": "ChronoFrame - 一款优雅的瀑布流相册系统",
+          "link": "https://blog.liushen.fun/posts/381a41ac/",
+          "excerpt": "这里是清羽AI，这篇文章由清羽飞扬介绍了一款名为ChronoFrame的开源瀑布流相册系统。该项目灵感源自Afilmory，但与之不同的是，ChronoFrame是一个可在线管理的动态照片系统，支持自动解析EXIF信息、展示拍摄位置、地图足迹回溯以及自动生成缩略图等功能，相比静态…",
+          "date": "2026-04-04T16:00:00.000Z"
+        },
+        {
+          "title": "兰空图床深度美化",
+          "link": "https://blog.liushen.fun/posts/eabede01/",
+          "excerpt": "这里是清羽AI，这篇文章记录了LiuShen利用GitHub Copilot与AI工具，对停更的兰空图床v2进行深度UI美化的全过程：重写登录页、上传组件、控制台与仪表盘，统一圆角扁平轻量风格，保留绿色主调并适配浅色模式；提供源码与Docker两种覆盖部署方案，强调先备份再替换，…",
+          "date": "2026-03-01T12:40:00.000Z"
+        },
+        {
+          "title": "年味",
+          "link": "https://blog.liushen.fun/posts/ed97d31c/",
+          "excerpt": "这里是清羽AI，这篇文章讲述了作者回家过年的经历和感受。作者发现，随着时间的推移，年味越来越淡，小时候的快乐也慢慢变得遥远。回家的时间越来越短，年夜饭的气氛和味道依然浓厚，但鞭炮和烟花却少了许多。作者在老家爬山，感受到身体的疲惫和岁月的变迁。年夜饭的菜肴依然丰盛，但作者更珍惜和家…",
+          "date": "2026-02-22T12:31:00.000Z"
+        },
+        {
+          "title": "2025，清风已至，正帆向星海",
+          "link": "https://blog.liushen.fun/posts/5db5181d/",
+          "excerpt": "这里是清羽AI，这篇文章回顾了作者从2025年考研失败到步入职场的心路历程，记录了在武汉、上海、成都等地的经历和感悟。作者在文中穿插了对黄鹤楼、东湖、湖北省博等地的回忆，以及对家人、老一辈、求职过程和音乐情感的深刻体会。文章以对成长的思考作为结尾，表达了从学生到职场人的蜕变，以及…",
+          "date": "2026-01-07T16:06:00.000Z"
+        }
+      ],
+      "fetchedAt": "2026-10-26T22:08:11.644Z"
     }
   ]
 }
