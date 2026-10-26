@@ -8,7 +8,6 @@
 
 export interface LinkForm {
 	author: string
-	sitenick?: string
 	title: string
 	desc: string
 	link: string
@@ -30,7 +29,6 @@ export interface ParseResult {
 /** 解析锚点。表单里的 label 文案一旦上线就不能改，改了就同步这里。 */
 export const labelMap: Record<string, keyof LinkForm> = {
 	作者自称: 'author',
-	站点简称: 'sitenick',
 	站点标题: 'title',
 	站点简介: 'desc',
 	站点地址: 'link',

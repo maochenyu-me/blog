@@ -59,17 +59,10 @@ body:
       required: true
 
   - type: input
-    id: sitenick
-    attributes:
-      label: 站点简称
-      description: 卡片上作者名后缀的短站名，可留空；与作者自称相同时留空即可。
-      placeholder: 喵洛阁
-
-  - type: input
     id: title
     attributes:
       label: 站点标题
-      description: 完整的站点标题，用于悬浮卡片和订阅源。
+      description: 完整的站点标题，用于友链卡片和订阅源。
       placeholder: 喵洛阁
     validations:
       required: true

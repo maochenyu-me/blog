@@ -39,7 +39,7 @@ describe('entryComment', () => {
 		assert.match(body, /\{\n\tauthor: '克喵:\)',\n\ttitle: '喵洛阁',\n\tdesc: '[^']*',\n\tlink: '[^']*',\n\tfeed: '[^']*',\n\ticon: '',\n\tavatar: '[^']*',\n\tdate: '2026-10-26',\n\},/)
 	})
 
-	it('可选的 sitenick 为空时整行省略', () => {
+	it('不再输出 sitenick（表单已去掉站点简称）', () => {
 		const body = entryComment(fields, '2026-10-26', [])
 		assert.ok(!body.includes('sitenick'))
 	})

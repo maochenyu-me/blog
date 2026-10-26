@@ -19,7 +19,6 @@ export const markers = {
 /** 字段顺序与 app/types/feed.ts 一致，长度上限按友链卡片的实际排版需要 */
 const fieldSpecs: Array<{ key: keyof LinkForm, max: number }> = [
 	{ key: 'author', max: 32 },
-	{ key: 'sitenick', max: 16 },
 	{ key: 'title', max: 60 },
 	{ key: 'desc', max: 120 },
 	{ key: 'link', max: 512 },

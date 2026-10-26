@@ -11,7 +11,7 @@ const fixture = fs.readFileSync(resolve(here, 'fixtures/link-issue-body.md'), 'u
 describe('splitSections', () => {
 	it('按 ### 切段，勾选项那段也是一个段', () => {
 		const sections = splitSections(fixture)
-		assert.equal(sections.length, 9)
+		assert.equal(sections.length, 8)
 		assert.equal(sections[0]!.label, '我已阅读并同意以下全部条款')
 		assert.match(sections[0]!.value, /^- \[X\] 遵守中国大陆法律法规/)
 	})
@@ -48,7 +48,6 @@ describe('parseIssueForm', () => {
 		assert.deepEqual(duplicated, [])
 		assert.deepEqual(unknown, [])
 		assert.equal(fields.author, '纸鹿本鹿')
-		assert.equal(fields.sitenick, '摸鱼处')
 		assert.equal(fields.title, '纸鹿摸鱼处')
 		assert.equal(fields.link, 'https://blog.zhilu.site/')
 		assert.equal(fields.feed, 'https://blog.zhilu.site/atom.xml')

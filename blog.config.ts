@@ -149,9 +149,9 @@ const blogConfig = {
 		/** 页面顶部头图卡片，image 留空时使用主题色渐变兜底 */
 		banner: {
 			/** 图片放在 public/img/banner/ 下，这里填站点路径如 `/img/banner/4.jpg`（宽高比约 3:1） */
-			image: '',
+			image: '/img/banner/4.jpg',
 			title: '热搜',
-			description: '微博、抖音、知乎、B站……各大平台热榜一处看完。',
+			description: '各大平台热榜，一处看完。',
 			/** 卡片最小高度，支持任意 CSS 长度 */
 			height: '13rem',
 		},

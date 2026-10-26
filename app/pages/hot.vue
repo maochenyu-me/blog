@@ -105,7 +105,8 @@ watch(visibility, (state) => {
 	<ZPageBanner v-if="banner" v-bind="banner">
 		<span class="banner-stat">
 			<Icon name="tabler:flame" />
-			{{ platforms.length }} 个平台 · {{ activePlatform?.name }}
+			<span>{{ platforms.length }} 个平台</span>
+			<span class="banner-stat-platform">· {{ activePlatform?.name }}</span>
 		</span>
 	</ZPageBanner>
 
@@ -213,6 +214,17 @@ watch(visibility, (state) => {
 	border-color: #FFF3;
 	background-color: #0004;
 	color: #FFF;
+}
+
+/*
+ * 亮色头图会把白色描述文字吃掉，本页把 PageBanner 的底部蒙版再压深一档
+ * （只影响本页，其他页面的头图蒙版不动）。描述文案本身按其他页面的惯例保持一句话，
+ * 这样右下角的统计块不会和它抢位，也就不需要用 padding 硬留白——那会让文字折行。
+ */
+.hot :deep(.page-banner.has-image) > .banner-mask {
+	background-image:
+		linear-gradient(to var(--end), hsl(220deg 10% 4% / 70%), transparent 72%),
+		linear-gradient(to top, hsl(220deg 10% 4% / 84%), transparent 80%);
 }
 
 .hot-body {
@@ -396,9 +408,14 @@ watch(visibility, (state) => {
 		width: 100%;
 	}
 
-	/* 窄屏下头图卡片右下角的统计块会和描述文字抢位，给描述留出避让空间 */
-	:deep(.page-banner) .banner-content > .banner-desc {
-		padding-inline-end: 9.5em;
+	/* 窄屏下给右下角统计块留出安全距离，描述文案再长也不会压上去 */
+	.hot :deep(.page-banner.has-image) .banner-desc {
+		max-width: 62%;
+	}
+
+	/* 当前平台在下面信息条里已有，窄屏的头图药丸只留平台总数，免得挤掉描述 */
+	.banner-stat-platform {
+		display: none;
 	}
 }
 </style>
