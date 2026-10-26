@@ -49,7 +49,7 @@ app/                  # 前端（Nuxt 4 结构）
     widget/           # 侧栏小组件
   composables/        # Vue 组合式函数（useArticle, usePagination, useShiki, useToc, useWidgets...）
   layouts/            # 布局（default.vue）
-  pages/              # 页面：[...slug].vue(正文/404), index(首页), archive, link, preview
+  pages/              # 页面：[...slug].vue(正文/404), index(首页), archive, feed(订阅), link, preview
   plugins/            # Nuxt/Vue 插件（article-transition.client, easter-egg, tippy...）
   stores/             # Pinia（layout.ts, search.ts）
   types/              # 类型定义
@@ -64,7 +64,7 @@ content/              # 文章（Nuxt Content 源）
 modules/
   anti-mirror/        # 恶意反代跳转防护模块（运行时注入脚本，列出镜像域名黑名单）
 patches/              # npm 包补丁（@nuxt/image, @nuxtjs/mdc, ipx, plain-shiki, @vue/shared）
-public/               # 静态资源（assets 订阅 XSLT 模板, fonts）
+public/               # 静态资源（favicon, fonts, img, music）
 remark-plugins/       # Unified 生态插件（rehype-meta-slots.ts, remark-code-component.ts）
 scripts/              # 脚本（init-project.ts, new-blog.ts, framework/）
 server/               # 服务端
@@ -102,8 +102,34 @@ pnpm-workspace.yaml   # pnpm catalogs
 
 - `server/api/stats.get.ts`：静态文章统计（词数、字数等），`routeRules` 中 `/api/stats` 预渲染并设 `application/json` 头。
 - `server/routes/atom.xml.get.ts`：Atom 订阅源；`subscriptions.opml.get.ts`：OPML 订阅聚合。
+- **订阅源不挂 `xml-stylesheet`**：Chrome 已弃用 XSLT，挂了会弹「此网站使用了 XSLT」警告。人类可读入口是 `app/pages/feed.vue`（`/feed`），导航里的订阅链接指向它，阅读器仍只认 `/atom.xml`。
 - 订阅源需要**绝对地址**，自托管时须让 `blog.config.ts` 的 `url` 与实际访问地址协议/主机/端口一致。
 - **改 API 路径时**，用 EdgeOne Makers 部署需同步改 `edgeone.json`。
+
+## 友链申请工作流（GitHub Issues）
+
+友链不再靠邮件/评论接收，统一走 issue 表单。
+
+- **标签必须先手工存在**：`友链申请`、`失联`、`无效`。表单 `labels:` 里不存在的标签会被 GitHub 静默丢弃，标签没了整条链路就不触发。
+- **表单**：`.github/ISSUE_TEMPLATE/link-application.yml`（规则 5 条逐 option `required: true`，少勾一条无法提交）、`config.yml`（禁用空白 issue）。
+- **三条工作流**：`link-apply-on-close.yml`（关闭时出 `feeds.ts` 条目）、`link-apply-preflight.yml`（打开时自动预检）、`link-apply-review.yml`（`失联`/`无效` 标签的差异化通知）。
+- **脚本**：`scripts/link-apply/`，入口 `comment-closed.ts` / `comment-preflight.ts` / `comment-review.ts`。**零依赖约定**：只 import `node:*`，相对导入必须带 `.ts` 扩展名，靠 Node 类型擦除直跑（需要 Node ≥22.18），工作流里**不跑 `pnpm install`**。新增依赖会破坏这个前提。
+- **幂等**：评论首行埋 `<!-- link-apply:<kind> -->` 隐藏标记，重跑时 PATCH 同一条评论，不刷屏。
+- **解析锚点是表单的 label 文案**（`scripts/link-apply/parse.ts` 的 `labelMap`），改了表单 label 必须同步改它。
+- **规则文案以表单勾选项为准**，`content/link.md` 只是概要；`pnpm init-project` 会重写 `content/link.md`（下游 fork 的默认文案），这是预期行为。
+- 本地调试：`pnpm link:test`；干跑用 `DRY_RUN=1 ISSUE_BODY_FILE=scripts/link-apply/fixtures/link-issue-body.md ISSUE_NUMBER=1 ISSUE_AUTHOR=a ISSUE_SENDER=a node scripts/link-apply/comment-closed.ts`。
+
+## 赞赏登记工作流（GitHub Issues）
+
+赞助数据由 issue 表单提交，管理员批准后机器人自动写进 `app/reward.ts` 的 `rewardList`。
+
+- **标签必须先存在**：`赞助`（同 `友链申请` 的坑，不存在的标签会被静默丢弃 → 整条链路不触发）。
+- **表单**：`.github/ISSUE_TEMPLATE/reward-application.yml`，字段 `名称 / 金额 / 时间 / 支付截图` 必填，`备注` 选填且**不入库**；截图只做审核凭证，不下载、不入库。
+- **两条工作流**：`reward-summary-on-close.yml`（关闭时发待审核摘要，`contents: read`）、`reward-apply-review.yml`（`issue_comment` 里出现「加入赞助名单」且评论者是 OWNER/MEMBER/COLLABORATOR 才写入 + commit main + 复用 deploy 重新部署）。
+- **脚本**：`scripts/reward-apply/`，入口 `comment-summary.ts` / `apply.ts` / `comment-result.ts`。同样**零依赖**（只 import `node:*`，相对导入带 `.ts`），复用 `../link-apply/` 的 `splitSections`/`tsQuote`/`deliver`/`dateInZone`。**回评必须等 push 有结果**，所以拆成 apply + comment-result 两段。
+- **写入规则**：只做**行级插入一行**，不重写数组（保住手写注释、diff 只有 `+1`）；按 `date` 降序插到正确位置，同日新条目排在已有同日条目之下；写盘前要过「文本逐行回环 + 临时 `.mts` 真跑一次 import」两道自检。
+- **幂等**：去重键是 `name + date`；评论用 `<!-- reward-apply:summary|applied|skipped|rejected -->` 标记覆盖写。push 失败不 rebase，而是 `reset --hard` 后重跑脚本。
+- 本地调试：`pnpm reward:test`；干跑用 `DRY_RUN=1 ISSUE_BODY_FILE=scripts/reward-apply/fixtures/reward-issue-body.md ISSUE_NUMBER=999 COMMENT_BODY='加入赞助名单' COMMENT_ASSOCIATION=OWNER node scripts/reward-apply/apply.ts`。
 
 ## 部署要点
 

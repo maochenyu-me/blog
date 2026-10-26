@@ -50,7 +50,7 @@ else {
 
 	<PostFooter v-bind="post" />
 	<PostSurround />
-	<PostComment />
+	<PostComment :page-title="post.title" />
 </template>
 
 <ZError

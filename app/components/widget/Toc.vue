@@ -10,6 +10,7 @@ const [DefineTemplate, ReuseTemplate] = createReusableTemplate({
 const { toc } = useArticle()
 const scrollableEl = useTemplateRef('toc')
 const { tocOffsets, activeHeadingId } = useToc(toc, computed(() => scrollableEl.value?.body))
+const rewardStore = useRewardStore()
 
 function hasHeading(tocTree: TocLink, heading?: string): boolean {
 	return tocTree.id === heading || !!tocTree.children?.some(child => hasHeading(child, heading))
@@ -29,9 +30,19 @@ function hasHeading(tocTree: TocLink, heading?: string): boolean {
 			<Icon name="tabler:arrow-bar-to-up" />
 		</a>
 
-		<a href="#twikoo" aria-label="评论区">
+		<a href="#comments" aria-label="评论区">
 			<Icon name="tabler:message-dots" />
 		</a>
+
+		<button
+			v-if="rewardStore.enabled"
+			type="button"
+			class="reward-action"
+			aria-label="打赏"
+			@click="rewardStore.open()"
+		>
+			<Icon name="tabler:sparkles" />
+		</button>
 	</template>
 
 	<!-- 放在顶层会导致 Transition 失效 -->
@@ -64,6 +75,23 @@ function hasHeading(tocTree: TocLink, heading?: string): boolean {
 </template>
 
 <style scoped>
+/* 与 BlogWidget 头部里 <a> 的操作按钮保持同样的手感 */
+.reward-action {
+	display: inline-flex;
+	padding: 0;
+	border: none;
+	background: none;
+	font-size: inherit;
+	line-height: inherit;
+	color: inherit;
+	transition: color 0.2s;
+	cursor: pointer;
+
+	&:hover {
+		color: var(--c-primary);
+	}
+}
+
 .toc {
 	position: relative;
 

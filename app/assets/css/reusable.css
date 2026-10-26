@@ -170,6 +170,13 @@
 	min-height: 70vh;
 }
 
+/* 卡片内的小字标签（区块卡头） */
+.card-tips {
+	font-size: 0.78em;
+	letter-spacing: 0.04em;
+	color: var(--c-text-3);
+}
+
 .round-cobblestone {
 	corner-shape: superellipse(1.2);
 }

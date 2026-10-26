@@ -66,7 +66,8 @@ export default defineEventHandler(async (event) => {
 		$xmlns: 'http://www.w3.org/2005/Atom',
 		id: blogConfig.url,
 		title: blogConfig.title,
-		updated: runtimeConfig.public.buildTime,
+		// buildTime 是带时区名的 ZonedDateTime 字符串，Atom 只接受 RFC3339，先归一化
+		updated: formatIsoDate(runtimeConfig.public.buildTime),
 		description: blogConfig.description, // RSS 2.0
 		author: {
 			name: blogConfig.author.name,
@@ -90,9 +91,10 @@ export default defineEventHandler(async (event) => {
 		entry: entries,
 	}
 
+	// 不再挂 xml-stylesheet：Chrome 已弃用 XSLT 并会弹「此网站使用了 XSLT」警告，
+	// 订阅源保持纯 XML，人类可读版见 /feed 页面
 	return builder.build({
 		'?xml': { $version: '1.0', $encoding: 'UTF-8' },
-		'?xml-stylesheet': blogConfig.feed.enableStyle ? { $type: 'text/xsl', $href: '/assets/atom.xsl' } : undefined,
 		feed,
 	})
 })

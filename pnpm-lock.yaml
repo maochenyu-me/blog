@@ -260,6 +260,9 @@ catalogs:
     '@iconify-json/catppuccin':
       specifier: ^1.2.17
       version: 1.2.17
+    '@iconify-json/devicon':
+      specifier: ^1.2.71
+      version: 1.2.71
     '@iconify-json/line-md':
       specifier: ^1.2.16
       version: 1.2.16
@@ -281,6 +284,9 @@ catalogs:
     '@nuxtjs/color-mode':
       specifier: ^4.0.1
       version: 4.0.1
+    ecoku:
+      specifier: 0.5.4
+      version: 0.5.4
     embla-carousel-autoplay:
       specifier: ^8.6.0
       version: 8.6.0
@@ -315,6 +321,9 @@ catalogs:
     fast-xml-builder:
       specifier: ^1.3.1
       version: 1.3.1
+    fast-xml-parser:
+      specifier: ^5.11.1
+      version: 5.11.1
     minisearch:
       specifier: ^7.2.0
       version: 7.2.0
@@ -398,6 +407,9 @@ importers:
       ci-info:
         specifier: catalog:framework
         version: 4.4.0
+      ecoku:
+        specifier: catalog:ui
+        version: 0.5.4
       embla-carousel-autoplay:
         specifier: catalog:ui
         version: 8.6.0(embla-carousel@8.6.0)
@@ -459,6 +471,9 @@ importers:
       '@iconify-json/catppuccin':
         specifier: catalog:ui
         version: 1.2.17
+      '@iconify-json/devicon':
+        specifier: catalog:ui
+        version: 1.2.71
       '@iconify-json/line-md':
         specifier: catalog:ui
         version: 1.2.16
@@ -486,6 +501,9 @@ importers:
       fast-xml-builder:
         specifier: catalog:util
         version: 1.3.1
+      fast-xml-parser:
+        specifier: catalog:util
+        version: 5.11.1
       nuxt-llms:
         specifier: catalog:content
         version: 0.2.0(magic-string@1.2.3)(magicast@0.5.4)(oxc-parser@0.143.0)(rolldown@1.2.7)(unplugin@3.3.0(esbuild@0.28.2)(rolldown@1.2.7)(rollup@4.63.1)(vite@8.2.2(@types/node@26.4.1)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.104.0)(sass@1.104.0)(terser@5.51.2)(yaml@2.9.0)))
@@ -1351,6 +1369,9 @@ packages:
 
   '@iconify-json/catppuccin@1.2.17':
     resolution: {integrity: sha512-l1pFOADEUlw+j7V+yfFzBowdE4deeMuI4amqfKaN+7uTI9B0Ho24C86DitQk5zb62NkEM9poOyfuG7WS2bw6jg==}
+
+  '@iconify-json/devicon@1.2.71':
+    resolution: {integrity: sha512-1o+Zl3QveZZoE6VMUl9hL4FEtyHC1NeUHO8sqBm2vb7oG1hL/43uzjKPXolG2tkQRkcEoi6TjH2qMss+xPCdAw==}
 
   '@iconify-json/line-md@1.2.16':
     resolution: {integrity: sha512-esHPUQUp30NyqJWa7MNu6ExdG8z/aEFC5r56rVyRGhtJ7acOme6YtYPnDOgVu6p+kk24rM8602xkFuBC6g6x+w==}
@@ -4074,6 +4095,10 @@ packages:
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
+
+  ecoku@0.5.4:
+    resolution: {integrity: sha512-Be4FAB0D+CGjdPxv0Av84Of0Xm/uNUO5SiJe+MAXNY90EO8ifDhulbLX0Tcte/zyrcOqfTKtxWx/LeNhOXb8Qg==}
+    engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
 
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
@@ -8533,6 +8558,10 @@ snapshots:
     dependencies:
       '@iconify/types': 2.0.0
 
+  '@iconify-json/devicon@1.2.71':
+    dependencies:
+      '@iconify/types': 2.0.0
+
   '@iconify-json/line-md@1.2.16':
     dependencies:
       '@iconify/types': 2.0.0
@@ -11608,6 +11637,8 @@ snapshots:
   duplexer@0.1.2: {}
 
   eastasianwidth@0.2.0: {}
+
+  ecoku@0.5.4: {}
 
   ee-first@1.1.1: {}
 

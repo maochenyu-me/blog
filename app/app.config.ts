@@ -58,14 +58,14 @@ export default defineAppConfig({
 		/** 侧边栏底部图标导航 */
 		iconNav: [
 			{ icon: 'tabler:home', text: '个人主页', url: blogConfig.author.homepage },
-			{ icon: 'tabler:rss', text: 'Atom订阅', url: '/atom.xml' },
+			{ icon: 'tabler:rss', text: '订阅', url: '/feed' },
 		] satisfies NavItem[],
 		/** 页脚站点地图 */
 		nav: [
 			{
 				title: '探索',
 				items: [
-					{ icon: 'tabler:rss', text: 'Atom订阅', url: '/atom.xml' },
+					{ icon: 'tabler:rss', text: '订阅', url: '/feed' },
 				],
 			},
 			{
@@ -107,8 +107,28 @@ export default defineAppConfig({
 			title: '',
 			items: [
 				{ icon: 'tabler:files', text: '文章', url: '/' },
-				{ icon: 'tabler:link', text: '友链', url: '/link' },
-				{ icon: 'tabler:archive', text: '归档', url: '/archive' },
+				{
+					icon: 'tabler:list',
+					text: '目录',
+					url: '#',
+					children: [
+						{ icon: 'tabler:archive', text: '归档', url: '/archive' },
+						{ icon: 'tabler:tag', text: '标签', url: '/tags' },
+					],
+				},
+				{ icon: 'tabler:flame', text: '热搜', url: '/hot' },
+				{ icon: 'tabler:message-2', text: '说说', url: '/memos' },
+				{
+					icon: 'tabler:users',
+					text: '友邻',
+					url: '#',
+					children: [
+						{ icon: 'tabler:link', text: '友链', url: '/link' },
+						{ icon: 'tabler:friends', text: '朋友圈', url: '/fcircle' },
+					],
+				},
+				{ icon: 'tabler:message-circle', text: '留言板', url: '/message' },
+				{ icon: 'tabler:user-circle', text: '关于', url: '/about' },
 			],
 		},
 	] satisfies Nav,

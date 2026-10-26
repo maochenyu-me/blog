@@ -1,3 +1,5 @@
+import type { Arch } from '../../shared/utils/icon'
+
 export interface FeedEntry {
 	/** 博客作者，使用作者明确的自称 */
 	author: string

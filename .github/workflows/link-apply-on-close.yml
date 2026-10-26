@@ -1,0 +1,41 @@
+name: 友链申请 · 关闭时生成条目
+
+# 申请人自行关闭 issue 表示「填完了」，这里把表单内容渲染成可直接粘贴到 app/feeds.ts 的条目；
+# 管理员关闭只发收录文案；带「失联 / 无效」标签或关闭为「不计划处理」时发驳回文案。
+# 全部判定在 scripts/link-apply/comment-closed.ts，工作流只负责环境与权限。
+on:
+  issues:
+    types: [closed]
+
+concurrency:
+  group: link-apply-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  comment:
+    if: contains(github.event.issue.labels.*.name, '友链申请')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # 脚本零依赖、只 import node:*，所以不装 pnpm / node_modules，整条跑完不到 30s
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # 直接跑 .ts 依赖类型擦除（Node >=22.18），固定 24 更省心
+          node-version: 24
+
+      # 解析或渲染回归会直接产出错条目，先过一遍单测（零依赖，秒级）
+      - name: Test parsers
+        run: node --test "scripts/link-apply/*.test.ts"
+
+      - name: Comment entry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/link-apply/comment-closed.ts

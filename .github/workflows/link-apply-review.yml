@@ -1,0 +1,43 @@
+name: 友链申请 · 失联 / 无效通知
+
+# 管理员重开 issue 并打上「失联」或「无效」标签时，先复检站点再发对应文案：
+# 失联 → 给出 HTTP 状态/错误信息，若复检其实可达就提示可能误标；
+# 无效 → 列出不符合的规则项（缺字段 / 非 HTTPS / 订阅源不可解析 / 文章不足）。
+# 管理员「先打标签再关闭」的路径由 link-apply-on-close.yml 兜住，这里只管 issue 仍处于 open 的情况。
+on:
+  issues:
+    types: [labeled, reopened]
+
+concurrency:
+  group: link-review-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  review:
+    # reopened 事件没有 label.name，只能靠 issue.labels 判断；两个标签同时存在时「无效」优先
+    if: >-
+      github.event.issue.state == 'open' &&
+      (contains(github.event.issue.labels.*.name, '失联') ||
+      contains(github.event.issue.labels.*.name, '无效'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test parsers
+        run: node --test "scripts/link-apply/*.test.ts"
+
+      - name: Comment review result
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/link-apply/comment-review.ts

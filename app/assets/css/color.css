@@ -1,6 +1,16 @@
 :root,
 .light {
 	--hue-theme: 220deg;
+
+	/**
+	 * 主题色：拆成 h/s/l 三段，由「切换主题色」按钮用内联样式覆盖（inline style 优先于此处）
+	 * --c-primary-base 保留用户所选原色，仅供取色圆点显示
+	 */
+	--c-primary-base: #1A5EFF;
+	--c-primary-h: 220deg;
+	--c-primary-l: 55%;
+	--c-primary-s: 100%;
+
 	--c-text: hsl(var(--hue-theme) 0% 0%);
 	--c-text-1: hsl(var(--hue-theme) 0% 20%);
 	--c-text-2: hsl(var(--hue-theme) 0% 40%);
@@ -13,8 +23,8 @@
 	--c-border: hsl(var(--hue-theme) 10% 91%);
 	--c-bg-a50: hsl(var(--hue-theme) 20% 98% / 50%);
 	--c-bg-a80: hsl(var(--hue-theme) 20% 98% / 80%);
-	--c-primary: hsl(var(--hue-theme) 100% 55%);
-	--c-primary-soft: hsl(var(--hue-theme) 100% 60% / 15%);
+	--c-primary: hsl(var(--c-primary-h) var(--c-primary-s) var(--c-primary-l));
+	--c-primary-soft: hsl(var(--c-primary-h) var(--c-primary-s) var(--c-primary-l) / 15%);
 	--c-accent: hsl(180deg 70% 60%);
 	--ld-bg-blur: var(--c-bg-1);
 	--ld-bg-card: var(--c-bg);
@@ -26,6 +36,14 @@
 	--c-warning-soft: #F932;
 	--c-error: #D55;
 	--c-error-soft: #F332;
+
+	/**
+	 * 中性卡片：按 -ld-bg-card/-c-bg-2 的明度重新取值，但不跟随主题蓝色相，
+	 * 用于说说这类以文字为主、需要低干扰背景的卡片
+	 */
+	--c-flat-card-bg: hsl(var(--hue-theme) 0% 100%);
+	--c-flat-card-bg-2: hsl(var(--hue-theme) 0% 96%);
+	--c-flat-card-border: hsl(var(--hue-theme) 0% 90%);
 
 	color-scheme: only light;
 }
@@ -43,12 +61,16 @@
 	--c-border: hsl(var(--hue-theme) 10% 20%);
 	--c-bg-a50: hsl(var(--hue-theme) 10% 10% / 50%);
 	--c-bg-a80: hsl(var(--hue-theme) 10% 10% / 80%);
-	--c-primary: hsl(var(--hue-theme) 100% 70%);
-	--c-primary-soft: hsl(var(--hue-theme) 100% 60% / 20%);
+	/* 暗底提亮 15% 保证对比度，与浅色模式共用同一组 --c-primary-h/s/l */
+	--c-primary: hsl(var(--c-primary-h) var(--c-primary-s) calc(var(--c-primary-l) + 15%));
+	--c-primary-soft: hsl(var(--c-primary-h) var(--c-primary-s) 60% / 20%);
 	--ld-bg-blur: var(--c-bg-a80);
 	--ld-bg-card: var(--c-bg-3);
 	--ld-bg-active: var(--c-primary-soft);
 	--ld-shadow: var(--c-bg-a50);
+	--c-flat-card-bg: hsl(var(--hue-theme) 0% 13%);
+	--c-flat-card-bg-2: hsl(var(--hue-theme) 0% 18%);
+	--c-flat-card-border: hsl(var(--hue-theme) 0% 21%);
 
 	color-scheme: dark;
 }

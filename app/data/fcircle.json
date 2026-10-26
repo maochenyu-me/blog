@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-10-24T05:49:45.115Z",
+  "sites": [
+    {
+      "id": "blog.zhilu.site",
+      "name": "纸鹿摸鱼处",
+      "link": "https://blog.zhilu.site/",
+      "avatar": "https://www.zhilu.site/api/avatar.png",
+      "icon": "https://www.zhilu.site/api/icon.png",
+      "feed": "https://blog.zhilu.site/atom.xml",
+      "status": "ok",
+      "items": [
+        {
+          "title": "北京实习300天",
+          "link": "https://blog.zhilu.site/2026/beijing-intern",
+          "excerpt": "从西安到北京，从校园到大厂实习，「300天」不只工作本身，有迁移也有变化。秩序常新，但内核与长期的事情不会变。",
+          "date": "2026-03-18T16:31:04.000Z"
+        },
+        {
+          "title": "实习后买了一堆东西",
+          "link": "https://blog.zhilu.site/2026/buy-right",
+          "excerpt": "键盘鼠标显示器，手环VR小东西。可以买贵的，但不能买贵了。",
+          "date": "2026-02-23T03:02:12.000Z",
+          "cover": "https://assets.zhilu.cyou/cover5/but-right.webp"
+        }
+      ],
+      "fetchedAt": "2026-10-24T05:49:45.115Z"
+    }
+  ]
+}

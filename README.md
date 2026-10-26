@@ -115,7 +115,6 @@
 │   └── anti-mirror # 恶意反代跳转
 ├── patches # npm 包补丁
 ├── public # 静态资源，生成在站点根目录
-│   ├── assets # 订阅源 XSLT 模板
 │   └── fonts # 字体
 ├── remark-plugins # Unified 生态插件
 ├── scripts # npm 脚本

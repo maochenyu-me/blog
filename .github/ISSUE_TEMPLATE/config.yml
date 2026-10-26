@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 友链页面（看规则与现有友链）
+    url: https://blog.kemeow.top/link
+    about: 申请前请先看一遍友链页面上的规则与本站信息
+  - name: 打不开申请表单时的备用方式
+    url: https://blog.kemeow.top/about
+    about: 通过关于页留下的联系方式直接找我

@@ -31,6 +31,12 @@ export default antfu({
 		'vue/valid-v-slot': 'off',
 	},
 }, {
+	// 脚本单元测试跑在 Node 内置 test runner 上（零依赖），不走 vitest
+	files: ['scripts/**/*.test.ts'],
+	rules: {
+		'test/no-import-node-test': 'off',
+	},
+}, {
 	files: ['**/*.json'],
 	ignores: ['content/**'],
 	rules: {

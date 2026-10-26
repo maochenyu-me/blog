@@ -1,0 +1,109 @@
+name: 赞助登记 · 管理员审核写入
+
+# 只有仓库 OWNER / MEMBER / COLLABORATOR 在带「赞助」标签的 issue 下回复「加入赞助名单」，
+# 才会把这条记录写进 app/reward.ts 并推送 main。这是整条链路唯一的写权限闸门。
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: reward-review-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  apply:
+    # 四个条件缺一不可：
+    # 1. 只认带「赞助」标签的 issue（其它 issue 的评论连 runner 都不启动）
+    # 2. issue_comment 对 PR 评论同样会触发，必须排除
+    # 3. 只认仓库成员；机器人自己的评论也排除（换 PAT 时才不会自触发）
+    # 4. 关键词命中
+    if: >-
+      contains(github.event.issue.labels.*.name, '赞助') &&
+      !github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+      contains(github.event.comment.body, '加入赞助名单')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # 跨 issue 的写入必须串行，否则两个 run 会同时改同一个文件
+    concurrency:
+      group: reward-apply-commit
+      cancel-in-progress: false
+    outputs:
+      status: ${{ steps.apply.outputs.status }}
+      pushed: ${{ steps.push.outputs.pushed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # 写错位置会直接毁数据，先过单测（零依赖，秒级）
+      - name: Test reward scripts
+        run: node --test "scripts/reward-apply/*.test.ts"
+
+      # 校验 + 行级插入 + 双重自检，结果写进 status（applied/noop/invalid/skipped/error）
+      - name: Apply entry
+        id: apply
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/reward-apply/apply.ts
+
+      - name: Commit and push
+        id: push
+        if: steps.apply.outputs.status == 'applied'
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git add app/reward.ts
+            git commit -m "chore(reward): 按 issue #${ISSUE_NUMBER} 新增赞赏记录"
+            if git push origin HEAD:main; then
+              echo "pushed=1" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            # 不 rebase：行级插入在别人的提交上必然冲突，重跑脚本才是幂等收敛
+            echo "::warning::push 失败（第 ${attempt} 次），同步远端后重跑插入"
+            git fetch --depth=1 origin main
+            git reset --hard FETCH_HEAD
+            status=$(node scripts/reward-apply/apply.ts | grep '^status=' | tail -n 1 | sed 's/^status=//')
+            echo "重跑后状态：${status}"
+            if [ "$status" = "noop" ]; then
+              echo "::notice::名单里已经有同名同日期的记录，不再重复写入"
+              echo "pushed=0" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "::error::连续 3 次推送失败，请管理员手工插入"
+          echo "pushed=0" >> "$GITHUB_OUTPUT"
+          exit 1
+
+      # 必须等 push 有结果再回评，否则 push 失败会留下「已加入」的假消息
+      # always()：即使 apply 阶段崩了也要留一条说明，不能红着不留痕
+      - name: Comment result
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/reward-apply/comment-result.ts
+
+  # 复用现成的部署工作流：GITHUB_TOKEN 的 push 不会触发 push 事件，必须显式调用
+  deploy:
+    needs: apply
+    if: needs.apply.outputs.pushed == '1'
+    uses: ./.github/workflows/deploy-cloudflare-pages.yml
+    secrets: inherit
+    permissions:
+      contents: read

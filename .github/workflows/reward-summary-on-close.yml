@@ -1,0 +1,41 @@
+name: 赞助登记 · 关闭时生成待审核摘要
+
+# 申请人自己关闭 issue = 填完了，这里把表单解析结果（名称/金额/日期 + 内联支付截图）
+# 贴到评论区供管理员核对。不写文件，所以只要 contents: read。
+on:
+  issues:
+    types: [closed]
+
+concurrency:
+  group: reward-summary-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  summary:
+    if: >-
+      contains(github.event.issue.labels.*.name, '赞助') &&
+      github.event.issue.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # 脚本零依赖、只 import node:*，所以不装 pnpm / node_modules
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # 直接跑 .ts 依赖类型擦除（Node >=22.18），固定 24 更省心
+          node-version: 24
+
+      - name: Test reward scripts
+        run: node --test "scripts/reward-apply/*.test.ts"
+
+      - name: Comment summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/reward-apply/comment-summary.ts

@@ -17,6 +17,8 @@ const { slots } = provideLayoutSlots()
 	</BlogAside>
 </div>
 <BlogFooter />
+<!-- 音乐：唯一的 UI 是导航入口打开的弹窗，关掉不中断播放（引擎常驻在模块里） -->
+<MusicPanel />
 <BlogPanel :has-aside="!!slots?.aside" />
 <BikariyaModals />
 </template>

@@ -1,0 +1,74 @@
+name: Update fcircle data
+
+# 每天凌晨抓一次友链订阅源，把结果写进 app/data/fcircle.json 并提交。
+# 提交后显式调用可复用的部署工作流重新构建（GITHUB_TOKEN 推送不会触发 push 事件，
+# 所以不能依赖 deploy-cloudflare-pages.yml 的 push 触发器）。
+on:
+  schedule:
+    # 北京时间每天 02:00（GitHub cron 使用 UTC，18:00 UTC = 次日 02:00 CST）
+    - cron: '0 18 * * *'
+  # 手动触发：仓库 → Actions → Update fcircle data → Run workflow
+  workflow_dispatch:
+
+concurrency:
+  group: fcircle
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # 与 package.json 的 packageManager 字段保持一致（pnpm@12.5.1）
+          version: 12.5.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 抓取逻辑先过单元测试，避免解析器回归把脏数据写进仓库
+      - name: Test parser
+        run: pnpm test
+
+      - name: Fetch friend feeds
+        run: pnpm fcircle:fetch
+
+      - name: Commit data if changed
+        id: commit
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain app/data/fcircle.json)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::朋友圈数据没有变化，跳过提交与部署"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/data/fcircle.json
+          git commit -m "chore(fcircle): 更新朋友圈数据 $(date -u +%Y-%m-%d)"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  # 数据有变化才重新构建部署；复用同一个部署工作流，避免两处维护
+  deploy:
+    needs: fetch
+    if: needs.fetch.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy-cloudflare-pages.yml
+    secrets: inherit
+    permissions:
+      contents: read

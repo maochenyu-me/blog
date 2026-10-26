@@ -55,7 +55,7 @@ const copyFields = {
 	</template>
 </Tab>
 
-<PostComment />
+<PostComment page-title="友链" />
 </template>
 
 <style scoped>

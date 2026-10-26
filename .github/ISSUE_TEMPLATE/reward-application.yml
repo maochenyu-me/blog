@@ -1,0 +1,75 @@
+name: 赞助登记
+description: 记录一笔赞赏。填完请自行关闭本 issue，管理员审核后会把昵称与金额写进关于页的赞赏名单。
+title: 赞助登记：
+labels: [赞助]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 填写说明
+
+        - 赞赏名单**只展示昵称 + 金额 + 日期**，不会展示支付截图和备注。
+        - 「支付截图」请把图片直接**拖进输入框**，会自动变成图片链接；仅用于人工核对，不会公开。
+        - **填完请自行关闭本 issue** 表示提交完成，机器人会贴出待审核摘要。
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 提交前请确认
+      options:
+        - label: 我已实际完成打款，且下列信息真实
+          required: true
+        - label: 我同意在关于页公开展示该昵称与金额
+          required: true
+
+  - type: input
+    id: name
+    attributes:
+      label: 名称
+      description: 展示在名单里的昵称，建议 16 字以内（脚本上限 24 字）。不想露脸可以直接填「无名氏」。
+      placeholder: 青柚不加冰
+    validations:
+      required: true
+
+  - type: input
+    id: amount
+    attributes:
+      label: 金额
+      description: 纯数字，最多两位小数，单位默认「元」。不要带 ¥ 符号。
+      placeholder: 例：66.66
+    validations:
+      required: true
+
+  - type: input
+    id: date
+    attributes:
+      label: 时间
+      description: 打款日期，格式 YYYY-MM-DD。
+      placeholder: 例：2026-09-12
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: 支付截图
+      description: 把图片直接拖进本输入框即可，请勿填写外部图床链接。仅管理员可见用途（不会进名单）。
+      placeholder: 拖拽图片到这里……
+    validations:
+      required: true
+
+  - type: input
+    id: note
+    attributes:
+      label: 备注
+      description: 选填。单位（如「贝壳」）或想说的话。**不会写入名单**，仅供审核参考。
+      placeholder: 用贝壳打赏的
+
+  - type: markdown
+    attributes:
+      value: |
+        ### 提交之后
+
+        1. 请**自行关闭本 issue**，机器人会贴出解析出的名称 / 金额 / 日期和支付截图供核对。
+        2. 管理员审核通过后会回复处理结果，名单自动更新到关于页。
+        3. 填错了请重新提交一份，不要编辑已关闭的 issue。

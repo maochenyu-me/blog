@@ -1,0 +1,42 @@
+name: 友链申请 · 自动预检
+
+# issue 一提交就自动探一遍站点：可访问性、HTTPS、订阅源、文章数、建站时长、域名类型。
+# 结果只作为提示发在评论里，不自动打标签、不自动关闭、不产生拒绝结论。
+on:
+  issues:
+    types: [opened]
+
+# 同一 issue 连续触发时只保留最新一次预检
+concurrency:
+  group: link-preflight-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  preflight:
+    # 只处理表单申请；顺手挡掉机器人刷 issue 的情况
+    if: >-
+      contains(github.event.issue.labels.*.name, '友链申请') &&
+      github.event.issue.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    # 要探站点首页 + 订阅源（各 8s 超时），留足余量
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test parsers
+        run: node --test "scripts/link-apply/*.test.ts"
+
+      - name: Comment preflight report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/link-apply/comment-preflight.ts

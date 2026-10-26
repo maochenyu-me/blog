@@ -1,0 +1,127 @@
+name: 友链申请
+description: 申请交换友链。请先勾选全部条款，再填写站点信息；填完后自行关闭本 issue 即视为提交完成。
+title: 友链申请：
+labels: [友链申请]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 申请前请确认
+
+        请先阅读下方条款并**全部勾选**（少勾一条无法提交），再填写自己的站点信息。
+        **填完后请自行关闭本 issue**，机器人会在评论区给出可直接粘贴到 `app/feeds.ts` 的条目。
+
+        ### 本站信息
+
+        | 字段 | 值 |
+        | --- | --- |
+        | 博主 | `克喵:)` |
+        | 站点 | `喵洛阁` |
+        | 介绍 | 每一段旅行，都有终点。 |
+        | 网址 | `https://blog.kemeow.top/` |
+        | 订阅源 | `https://blog.kemeow.top/atom.xml` |
+        | 头像 | `https://blog.kemeow.top/img/avatar/avatar.webp` |
+
+        ### 友链规则
+
+        1. 遵守中国大陆法律法规，不发布违法违规、侵权内容。
+        2. 有持续维护博客的决心：已有至少 8 篇文章，且建站满 3 个月以上。
+        3. 不接受纯广告、采集、搬运站点；适度的广告与赞助可以接受。
+        4. 免费域名（如 `github.io`、`pages.dev`、`vercel.app`）可以接受，但过于冷门、稳定性无保障的免费域名不予收录。
+        5. 已添加本站为友链（非硬性要求，但会优先通过）。
+
+        > 条款最终以本表单的勾选项为准。本站友链统一使用 HTTPS，请确保你的站点支持 HTTPS 且能正常访问。
+
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: 我已阅读并同意以下全部条款
+      description: 每一项都必须勾选才能提交。全部勾选视作已读并认可上述规则。
+      options:
+        - label: 遵守中国大陆法律法规，不发布违法违规、侵权内容
+          required: true
+        - label: 已有至少 8 篇文章，且建站满 3 个月以上，愿意持续维护
+          required: true
+        - label: 不是纯广告、采集、搬运站点（适度的广告与赞助可以接受）
+          required: true
+        - label: 不使用过于冷门、稳定性无保障的免费域名（github.io、pages.dev 等主流免费域名可以）
+          required: true
+        - label: 我已了解「已添加本站为友链」不是硬性要求，但会优先通过
+          required: true
+
+  - type: input
+    id: author
+    attributes:
+      label: 作者自称
+      description: 你的常用笔名，会作为友链卡片的主标题。不要填站点名。
+      placeholder: '克喵:)'
+    validations:
+      required: true
+
+  - type: input
+    id: sitenick
+    attributes:
+      label: 站点简称
+      description: 卡片上作者名后缀的短站名，可留空；与作者自称相同时留空即可。
+      placeholder: 喵洛阁
+
+  - type: input
+    id: title
+    attributes:
+      label: 站点标题
+      description: 完整的站点标题，用于悬浮卡片和订阅源。
+      placeholder: 喵洛阁
+    validations:
+      required: true
+
+  - type: textarea
+    id: desc
+    attributes:
+      label: 站点简介
+      description: 一句话介绍你的博客，建议 30 字以内。
+      placeholder: 每一段旅行，都有终点。
+    validations:
+      required: true
+
+  - type: input
+    id: link
+    attributes:
+      label: 站点地址
+      description: 完整地址，必须带 `https://` 协议头，建议以 `/` 结尾。
+      placeholder: 'https://blog.example.com/'
+    validations:
+      required: true
+
+  - type: input
+    id: feed
+    attributes:
+      label: 订阅源
+      description: RSS / Atom / JSON Feed 完整地址，用于朋友圈抓取。
+      placeholder: 'https://blog.example.com/atom.xml'
+    validations:
+      required: true
+
+  - type: input
+    id: avatar
+    attributes:
+      label: 头像地址
+      description: 正方形头像图片直链，建议 256×256。相对路径请补全为完整地址。
+      placeholder: 'https://blog.example.com/avatar.png'
+    validations:
+      required: true
+
+  - type: input
+    id: icon
+    attributes:
+      label: 站点图标
+      description: 小图标直链，可留空；留空时机器人会尝试自动抓取 favicon。
+      placeholder: 'https://blog.example.com/favicon.ico'
+
+  - type: markdown
+    attributes:
+      value: |
+        ### 提交之后
+
+        1. 机器人会自动预检你的站点（能否访问、订阅源是否可解析、文章数与建站时间），**只作提示，不自动拒绝**。
+        2. 请**自行关闭本 issue** 表示提交完成，机器人会在评论区贴出可直接粘贴的条目。
+        3. 管理员审核后收录。若站点失联或不符合规则，issue 会被重新打开并标记，机器人会在此说明原因。
