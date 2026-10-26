@@ -15,5 +15,17 @@ export default [{
 		archs: ['Nuxt', 'Vercel'],
 		date: '2019-07-19',
 		comment: 'Clarity 主题作者',
+	},	{
+		author: '清羽飞扬',
+		sitenick: '清羽飞扬',
+		title: '清羽飞扬',
+		desc: '柳影曳曳，清酒孤灯，扬笔撒墨，心境如霜',
+		link: 'https://blog.liushen.fun/',
+		feed: 'https://blog.liushen.fun/atom.xml',
+		icon: 'https://blog.liushen.fun/info/avatar.ico',
+		avatar: 'https://blog.liushen.fun/info/avatar.ico',
+		date: '2026-10-26',
+		archs: ['Astro', 'EdgeOne'],
+		comment: 'hexo-theme-liushen 主题作者',
 	}],
 }] satisfies FeedGroup[]
