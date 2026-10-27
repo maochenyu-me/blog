@@ -31,6 +31,7 @@ const { data: previewCount } = useAsyncData(
 	<WidgetBlogStats />
 	<WidgetBlogTech />
 	<WidgetCommGroup />
+	<WidgetCountdown />
 </template>
 
 <BlogHeader class="hide-above-mobile" to="/" tag="h1" />

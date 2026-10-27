@@ -31,6 +31,18 @@ export default defineAppConfig({
 			tabSize: 3,
 		},
 
+		/** 倒计时 widget */
+		countdown: {
+			/** 「距离」下方显示的节日名称 */
+			targetName: '春节',
+			/** 显示当天所属的农历日期 */
+			showLunar: true,
+			/** 显示目标春节的干支生肖年 */
+			showZodiac: true,
+			/** 一周的开始日，1=周一 … 7=周日，默认周一 */
+			weekStart: 1,
+		},
+
 		/** 文章开头摘要 */
 		excerpt: {
 			animation: true,
@@ -134,6 +146,7 @@ export default defineAppConfig({
 				},
 				{ icon: 'tabler:flame', text: '热搜', url: '/hot' },
 				{ icon: 'tabler:message-2', text: '说说', url: '/memos' },
+				{ icon: 'tabler:photo', text: '相册', url: '/gallery' },
 				{
 					icon: 'tabler:users',
 					text: '友邻',
