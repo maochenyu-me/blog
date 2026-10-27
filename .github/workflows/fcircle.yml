@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.commit.outputs.changed }}
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,12 +64,16 @@ jobs:
           git commit -m "chore(fcircle): 更新朋友圈数据 $(date -u +%Y-%m-%d)"
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   # 数据有变化才重新构建部署；复用同一个部署工作流，避免两处维护
+  # 必须把新提交 SHA 传下去：workflow_call 里的 github.sha 是触发时的旧提交，不传就会部署旧数据
   deploy:
     needs: fetch
     if: needs.fetch.outputs.changed == 'true'
     uses: ./.github/workflows/deploy-cloudflare-pages.yml
+    with:
+      ref: ${{ needs.fetch.outputs.sha }}
     secrets: inherit
     permissions:
       contents: read

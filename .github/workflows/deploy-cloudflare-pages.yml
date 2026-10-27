@@ -17,6 +17,13 @@ on:
   # 被其他工作流复用（见 fcircle.yml）。注意 GITHUB_TOKEN 推送的提交不会触发 push 事件，
   # 定时任务改完数据后必须这样显式调用，否则线上不会重新构建。
   workflow_call:
+    inputs:
+      # 被复用时 github.sha 仍是调用方触发时的提交（定时任务是推送前的旧提交），
+      # 因此由调用方把新提交 SHA 显式传进来，否则会构建部署旧数据。
+      ref:
+        description: '要构建部署的提交（SHA 或分支），留空则使用 github.sha'
+        required: false
+        type: string
 
 concurrency:
   group: deploy-cloudflare-pages
@@ -36,6 +43,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -57,6 +66,7 @@ jobs:
 
       - name: Verify build output
         run: |
+          echo "::notice::building $(git rev-parse --short HEAD) $(git log -1 --pretty=%s)"
           if [ ! -d .output/public ]; then
             echo "::error::Build output directory .output/public not found"
             exit 1
