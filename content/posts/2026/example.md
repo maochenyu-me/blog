@@ -5,6 +5,9 @@ date: 2024-09-21 23:18:18
 updated: 2026-04-06 17:25:03
 aside: [toc, meta-aside-foo, meta-aside-bar]
 # type: story
+aiSummary: "本文介绍了在 Markdown 中使用 Vue 组件的多种方法，包括通过 CSS 类名控制样式、链接组件、代码块高亮、数学公式渲染、自定义组件如 Alert、Badge、BlogHeader 等，以及图表和乐谱的渲染方式。文章还展示了如何通过插件实现脚注、许可协议、图片灯箱等功能，并提供了丰富的示例和配置说明，帮助开发者更好地理解和应用这些组件。"
+aiSummaryModel: "Qwen/Qwen3-8B"
+aiSummaryAt: "2026-10-27"
 ---
 
 ## 在 Markdown 中使用组件

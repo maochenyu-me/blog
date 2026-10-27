@@ -8,6 +8,8 @@ const { data: post } = await useAsyncData(
 )
 
 const excerpt = computed(() => post.value?.description || '')
+/** 有 AI 摘要就显示摘要卡，没有才回退到 description 的打字机摘要 */
+const aiSummary = computed(() => post.value?.aiSummary?.trim() || '')
 const asideWidgetNames = computed<WidgetName[]>(() => {
 	if (!post.value)
 		return ['blog-log']
@@ -38,7 +40,8 @@ else {
 
 <template v-if="post">
 	<PostHeader v-bind="post" />
-	<PostExcerpt v-if="excerpt" :excerpt />
+	<PostAiSummary v-if="aiSummary" :summary="aiSummary" :model="post.aiSummaryModel" />
+	<PostExcerpt v-else-if="excerpt" :excerpt />
 	<!-- 正文使用纯透明度入场，保证 URL 锚点和目录测量不受位移影响。 -->
 	<ContentRenderer
 		class="article"

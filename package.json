@@ -23,6 +23,7 @@
     "lint:fix": "eslint --fix",
     "init-project": "unrun scripts/init-project.ts",
     "new": "unrun scripts/new-blog.ts",
+    "ai:summary": "unrun scripts/ai-summary/index.ts",
     "check:feed": "unrun scripts/framework/get-feed.ts",
     "check:feed/all": "unrun scripts/framework/check-all-feeds.ts",
     "link:closed": "node scripts/link-apply/comment-closed.ts",

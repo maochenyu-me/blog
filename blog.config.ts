@@ -333,8 +333,9 @@ const blogConfig = {
 		 * 统计范围，匹配 content 下不含扩展名的路径（stem）；空数组统计全部内容
 		 * 使用 SQL LIKE 语法：% 匹配任意长度字符，_ 匹配单个字符
 		 * 多个范围取并集，如 ['posts/%', 'book/%']
+		 * 只统计 content/posts 下的文章，about/link 等页面不计入篇数与字数
 		 */
-		includePaths: [] as string[],
+		includePaths: ['posts/%'] as string[],
 	},
 
 	/** 自己部署的 Twikoo 服务 */

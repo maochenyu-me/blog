@@ -37,6 +37,22 @@ export default defineAppConfig({
 			caret: '_',
 		},
 
+		/** 文章开头的 AI 摘要卡（内容由 scripts/ai-summary 写入 frontmatter） */
+		aiSummary: {
+			/** 标题文案 */
+			label: 'AI 摘要',
+			/** 模型厂商标注，与模型名拼成右侧徽标，如「SiliconFlow · Qwen3-8B」 */
+			provider: 'SiliconFlow',
+			/** 逐字打出摘要；关闭或系统开启「减少动态效果」时整段直出 */
+			animation: true,
+			/** 打字机总时长（毫秒），单字间隔在此基础上有上下限 */
+			duration: 2200,
+			/** 打字机光标 */
+			caret: '_',
+			/** 窄屏下超过这个字数就折叠 */
+			foldAfter: 80,
+		},
+
 		/** 精选文章 Slide */
 		slide: {
 			/** 适合封面图无字时启用 */

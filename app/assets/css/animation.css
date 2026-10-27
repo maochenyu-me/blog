@@ -6,8 +6,12 @@
 	--motion-easing: ease-out;
 	--max-bezier-to-full: cubic-bezier(0.5, 0, 1, 0.5);
 	--max-bezier-to-collapse: cubic-bezier(0, 0.5, 0.5, 1);
+	/* 明暗切换：圆形扩散揭示的时长与缓动，由 ThemeToggle 触发 */
+	--theme-motion-duration: 0.48s;
+	--theme-motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
+	/* 无 View Transition 时的降级过渡时长，需与 ThemeToggle 里的收尾定时器一致 */
+	--theme-fallback-duration: 0.3s;
 
-	transition: color 0.1s, background-color 0.2s;
 	scroll-behavior: smooth;
 }
 
@@ -163,6 +167,57 @@
 		mix-blend-mode: normal;
 		z-index: 1;
 	}
+}
+
+/* ── 明暗主题切换 ───────────────────────────────────────────
+ * 两条路径互斥，由 ThemeToggle 决定用哪条：
+ * 1. 支持 View Transition：整页快照 + 从点击处扩散的圆形揭示（data-theme-transition）。
+ *    快照期间元素自身的 transition 不参与，避免快照抓到达半程的颜色而闪烁。
+ * 2. 不支持：给 <html> 挂 .theme-transition，一次性把全站颜色纳入同一段过渡。
+ */
+@keyframes theme-reveal {
+	from {
+		clip-path: circle(0px at var(--theme-x) var(--theme-y));
+	}
+
+	to {
+		clip-path: circle(var(--theme-radius) at var(--theme-x) var(--theme-y));
+	}
+}
+
+/* 特异性高于上文的 ::view-transition-old/new(root) 基础规则，仅切换主题时生效 */
+:root[data-theme-transition]::view-transition-old(root) {
+	display: block;
+	animation: none;
+	mix-blend-mode: normal;
+}
+
+:root[data-theme-transition]::view-transition-new(root) {
+	animation: theme-reveal var(--theme-motion-duration) var(--theme-motion-easing) both;
+	mix-blend-mode: normal;
+}
+
+/**
+ * 快照期间冻结元素自身的过渡：配色是在快照前一刻改的，若元素带着 transition，
+ * 新快照抓到的就是过渡起点色，圆里会出现「揭开了却没变色」的错觉。
+ * !important 优先于一切普通声明，无需和组件的 transition 争特异性。
+ */
+:root[data-theme-transition] *,
+:root[data-theme-transition] *::before,
+:root[data-theme-transition] *::after {
+	transition-duration: 0s !important;
+	transition-delay: 0s !important;
+}
+
+/* 降级路径：只在这些属性上用 !important，保证全站同频，不被局部的 transition 抢先 */
+:root.theme-transition,
+:root.theme-transition *,
+:root.theme-transition *::before,
+:root.theme-transition *::after {
+	transition-property: background-color, border-color, color, fill, stroke, box-shadow, outline-color, text-decoration-color !important;
+	transition-duration: var(--theme-fallback-duration) !important;
+	transition-timing-function: var(--theme-motion-easing) !important;
+	transition-delay: 0s !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

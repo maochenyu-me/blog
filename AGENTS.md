@@ -25,6 +25,7 @@
 | `pnpm generate` | **SSG 静态构建**（生产部署用，输出 `dist/`） |
 | `pnpm preview` | 预览构建产物 |
 | `pnpm new` | 交互式创建新文章（运行 `scripts/new-blog.ts`） |
+| `pnpm ai:summary` | 交互式补 AI 摘要（`--all` / `--missing` / `--dry-run`，见 `scripts/ai-summary/`） |
 | `pnpm init-project` | 初始化/重置项目配置与示例内容（`--yes` 跳过确认） |
 | `pnpm lint` / `pnpm lint:fix` | ESLint 检查 / 自动修复 |
 | `pnpm check:feed` | 检测单个友链/任意 URL 的托管商与可访问性 |
