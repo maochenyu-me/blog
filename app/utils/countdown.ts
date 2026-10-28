@@ -109,13 +109,10 @@ export function getCountdownProgress(
 	if (unit === 'week')
 		return getWeekProgress(now, weekStart)
 
-	const calculators = {
-		day: getDayProgress,
-		month: getMonthProgress,
-		year: getYearProgress,
-	} as const
+	if (unit === 'year')
+		return getSpringYearProgress(now)
 
-	return calculators[unit](now)
+	return unit === 'day' ? getDayProgress(now) : getMonthProgress(now)
 }
 
 function getLunarDayName(day: number): string {
@@ -196,33 +193,54 @@ function getLunarYearDaysCount(year: number): number {
 	return sum
 }
 
+/**
+ * 四个进度条统一口径：**剩余量不含当前单位**（今天/本周/本月/本农历年已过部分），
+ * 因此「剩余」与「百分比」不会再像旧实现那样互相矛盾，且能真正走到 0 / 100%。
+ */
+
 function getDayProgress(now: Date): { remaining: number, percentage: number } {
-	const hours = now.getHours()
-	return { remaining: 24 - hours, percentage: (hours / 24) * 100 }
+	// 按分钟计，避免 09:00 与 09:59 显示同样的剩余小时；
+	// 不足一小时按一小时计（向上取整），使数值只在整点跳变
+	const passedMinutes = now.getHours() * 60 + now.getMinutes()
+	const totalMinutes = 24 * 60
+	const remainingHours = (totalMinutes - passedMinutes) / 60
+	return { remaining: Math.ceil(remainingHours), percentage: (passedMinutes / totalMinutes) * 100 }
 }
 
 function getWeekProgress(now: Date, weekStart: number): { remaining: number, percentage: number } {
 	// 转为 ISO 星期：1=周一 … 7=周日
 	const isoDay = now.getDay() === 0 ? 7 : now.getDay()
-	// 与日/月/年一致：当天不计入已过比例，剩余量包含当天
+	// 本周已过的整天数，今天不算已过
 	const passed = (isoDay - weekStart + 7) % 7
-	return { remaining: 7 - passed, percentage: (passed / 7) * 100 }
+	return { remaining: 7 - passed - 1, percentage: (passed / 7) * 100 }
 }
 
 function getMonthProgress(now: Date): { remaining: number, percentage: number } {
 	const total = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+	// 本月已过的整天数，今天不算已过
 	const passed = now.getDate() - 1
-	return { remaining: total - passed, percentage: (passed / total) * 100 }
+	return { remaining: total - passed - 1, percentage: (passed / total) * 100 }
 }
 
-function getYearProgress(now: Date): { remaining: number, percentage: number } {
-	const start = Date.UTC(now.getFullYear(), 0, 1)
-	const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
-	const total = isLeapYear(now.getFullYear()) ? 366 : 365
-	const passed = (today - start) / 86400000
-	return { remaining: total - passed, percentage: (passed / total) * 100 }
+/**
+ * 年进度以春节为界：上一个春节 → 下一个春节，与卡片大字的「距离春节」同源，
+ * 避免出现「距离春节 101 天」而「年」只剩 65 天这种自相矛盾的读法。
+ */
+function getSpringYearProgress(now: Date): { remaining: number, percentage: number } {
+	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+	const next = resolveSpringFestivalDate(now)
+	const prev = getSpringFestivalDate(today.getFullYear() - (isBeforeThisYearSpringFestival(today) ? 1 : 0))
+	if (!next || !prev)
+		return { remaining: 0, percentage: 0 }
+
+	const total = Math.round((next.getTime() - prev.getTime()) / 86400000)
+	// 距下一个春节的天数（不含今天、不含目标当天），与大字 daysUntil 一致
+	const remaining = Math.round((next.getTime() - today.getTime()) / 86400000)
+	return { remaining, percentage: ((total - remaining) / total) * 100 }
 }
 
-function isLeapYear(year: number): boolean {
-	return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+/** 今天是否还在本年春节之前（此时「上一个春节」属于上一年） */
+function isBeforeThisYearSpringFestival(today: Date): boolean {
+	const thisYear = getSpringFestivalDate(today.getFullYear())
+	return !!thisYear && today < thisYear
 }
