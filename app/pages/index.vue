@@ -30,6 +30,7 @@ const { data: previewCount } = useAsyncData(
 <template #aside>
 	<WidgetBlogStats />
 	<WidgetBlogTech />
+	<WidgetVisitor />
 	<WidgetCommGroup />
 	<WidgetCountdown />
 </template>
