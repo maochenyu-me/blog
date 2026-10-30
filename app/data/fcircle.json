@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-29T22:14:22.165Z",
+  "generatedAt": "2026-10-30T21:49:29.843Z",
   "sites": [
     {
       "id": "blog.zhilu.site",
@@ -11,6 +11,12 @@
       "status": "ok",
       "items": [
         {
+          "title": "不在大学",
+          "link": "https://blog.zhilu.site/2026/out-of-campus",
+          "excerpt": "在2026年的春天，不断在北京与西安往返。春节、实验室周年庆、毕设两次线下代码验收、答辩，在车轮上一趟又一趟，将去向何方……",
+          "date": "2026-05-03T02:47:48.000Z"
+        },
+        {
           "title": "北京实习300天",
           "link": "https://blog.zhilu.site/2026/beijing-intern",
           "excerpt": "从西安到北京，从校园到大厂实习，「300天」不只工作本身，有迁移也有变化。秩序常新，但内核与长期的事情不会变。",
@@ -21,10 +27,10 @@
           "link": "https://blog.zhilu.site/2026/buy-right",
           "excerpt": "键盘鼠标显示器，手环VR小东西。可以买贵的，但不能买贵了。",
           "date": "2026-02-23T03:02:12.000Z",
-          "cover": "https://assets.zhilu.cyou/cover5/but-right.webp"
+          "cover": "https://assets.zhilu.cyou/cover6/buy-right.webp"
         }
       ],
-      "fetchedAt": "2026-10-29T22:14:22.165Z"
+      "fetchedAt": "2026-10-30T21:49:29.843Z"
     },
     {
       "id": "blog.liushen.fun",
@@ -96,7 +102,7 @@
           "date": "2026-01-07T16:06:00.000Z"
         }
       ],
-      "fetchedAt": "2026-10-29T22:14:22.165Z"
+      "fetchedAt": "2026-10-30T21:49:29.843Z"
     }
   ]
 }
