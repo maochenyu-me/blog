@@ -71,7 +71,7 @@ export default defineNuxtConfig({
 				...(blogConfig.twikoo.preload ? [{ rel: 'preconnect' as const, href: blogConfig.twikoo.preload }] : []),
 				// Ecoku 的评论接口在客户端挂载后才请求，提前建连把 TLS 握手摊到解析 HTML 的空档里
 				...(blogConfig.comment.provider === 'ecoku' ? [{ rel: 'preconnect' as const, href: blogConfig.comment.ecoku.serverURL }] : []),
-				{ rel: 'stylesheet', href: 'https://s4.zstatic.net/npm/katex@0.16.44/dist/katex.min.css' },
+				{ rel: 'stylesheet', href: 'https://s4.zstatic.net/npm/katex@0.16.47/dist/katex.min.css' },
 				// "InterVariable", "Inter"
 				{ rel: 'stylesheet', href: 'https://s4.zstatic.net/npm/inter-ui@4.1.1/inter-variable.css' },
 				{ rel: 'stylesheet', href: 'https://s4.zstatic.net/npm/inter-ui@4.1.1/inter.css' },
@@ -245,8 +245,9 @@ export default defineNuxtConfig({
 		build: {
 			markdown: {
 				highlight: false,
-				// @keep-sorted
 				remarkPlugins: {
+					// demo 在解析阶段展开，预览与正文共用后续转换插件。
+					[pluginPath('remark-demo')]: {},
 					[pluginPath('remark-code-component')]: {
 						options: {
 							'mermaid': { component: 'mermaid', prop: 'code' },
