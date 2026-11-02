@@ -42,7 +42,8 @@ export default defineNuxtPlugin((nuxtApp) => {
 		const target = resolveInterceptedHref(href, window.location.href, config.links)
 		if (!target)
 			return
-		const { path } = nuxtApp.$router.currentRoute.value
+		const current = nuxtApp.$router.currentRoute.value
+		const { path } = current
 		// 中转页自身永不拦截，避免配置被改动后出现死循环
 		if (normalizeContentPath(path) === normalizeContentPath(config.route.path))
 			return
@@ -51,6 +52,16 @@ export default defineNuxtPlugin((nuxtApp) => {
 		// 修饰键点击表达的是「在新标签打开」的意图，拦截时不要吞掉这个意图
 		const newTab = middleClick || event.ctrlKey || event.metaKey || event.shiftKey
 		event.preventDefault()
+		if (!newTab) {
+			// 记下来源页面与滚动位置：返回时由中转页负责恢复。
+			// 不能依赖路由器的 savedPosition——实测它落位既晚又有几十像素出入。
+			try {
+				sessionStorage.setItem(SAFEGO_ORIGIN_KEY, JSON.stringify({ path, y: Math.round(window.scrollY) }))
+			}
+			catch {
+				// 隐私模式下 sessionStorage 可能不可写，退化成只按历史返回
+			}
+		}
 		const url = buildSafeGoUrl(config.route.path, config.route.param, target, config.route.base64)
 		if (newTab)
 			window.open(url, '_blank')

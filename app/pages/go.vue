@@ -62,11 +62,85 @@ function jump() {
 	window.location.replace(targetInfo.value.href)
 }
 
+/** 等待路由切回来源页的上限 */
+const SCROLL_RETURN_TIMEOUT_MS = 3_000
+/**
+ * 锁定滚动位置的上限，从路由切回来源页开始计时。
+ * 实测本站 Nuxt 默认 scrollBehavior 会迟到 8 秒以上（见下方说明），所以窗口要给够。
+ */
+const SCROLL_PIN_WINDOW_MS = 12_000
+/** 读者一旦自己操作就立刻停止校正，不和读者抢滚动条 */
+const SCROLL_RELEASE_EVENTS = ['wheel', 'touchstart', 'keydown', 'mousedown'] as const
+
+/**
+ * 按我们自己记录的来源位置恢复并锁定滚动。
+ *
+ * 为什么不能只依赖 `router.back()`：实测（2026-11-02，localhost:3000）在本项目里
+ * Nuxt 默认的 scrollBehavior 要等 `page:loading:end` 才落位，本站被侧栏 Visitor 的
+ * 慢接口拖到 8.5 秒后才开始滚动；而且它用的 savedPosition 与点击时的真实位置
+ * 有几十像素出入（实测 627 → 576）。所以两边都不能指望：
+ *   1. 先等路由真正切回来源页（切换前就判断「离开」会让循环当场自杀）；
+ *   2. 之后每 100ms 校正一次，把迟到的 scrollBehavior 也盖回去；
+ *   3. 期间临时关掉 `scroll-behavior: smooth`，避免两股平滑滚动对撞出可见跳动；
+ *   4. 读者一动（滚轮/触摸/按键/按住）就立即收手。
+ */
+function restoreOriginScroll(origin: { path: string, y: number }) {
+	const root = document.documentElement
+	let waited = 0
+	let pinned = 0
+	let released = false
+
+	function cleanup() {
+		if (released)
+			return
+		released = true
+		clearInterval(timer)
+		root.style.removeProperty('scroll-behavior')
+		for (const type of SCROLL_RELEASE_EVENTS)
+			window.removeEventListener(type, cleanup)
+	}
+
+	const timer = setInterval(() => {
+		if (router.currentRoute.value.path !== origin.path) {
+			waited += 100
+			// 已经锁定过却又离开了来源页，说明读者去了别处，立即收手
+			if (pinned > 0 || waited > SCROLL_RETURN_TIMEOUT_MS)
+				cleanup()
+			return
+		}
+		if (pinned === 0) {
+			waited = 0
+			root.style.setProperty('scroll-behavior', 'auto')
+		}
+		pinned += 100
+		if (pinned > SCROLL_PIN_WINDOW_MS) {
+			cleanup()
+			return
+		}
+		const max = document.documentElement.scrollHeight - window.innerHeight
+		const top = Math.min(origin.y, Math.max(max, 0))
+		if (Math.abs(window.scrollY - top) > 1)
+			window.scrollTo({ top, behavior: 'instant' })
+	}, 100)
+
+	for (const type of SCROLL_RELEASE_EVENTS)
+		window.addEventListener(type, cleanup, { passive: true })
+}
+
 function goBack() {
 	stopTimer()
-	// 同标签页普通点击路径：Vue Router 会带上 back，Nuxt 据此恢复原来的滚动位置
+	// 同标签页普通点击路径：先退回历史上一页，再用我们自己记录的位置校正滚动
 	if (window.history.state?.back) {
+		let origin: { path: string, y: number } | null = null
+		try {
+			origin = parseOrigin(sessionStorage.getItem(SAFEGO_ORIGIN_KEY))
+		}
+		catch {
+			origin = null
+		}
 		router.back()
+		if (origin)
+			restoreOriginScroll(origin)
 		return
 	}
 	// 由 window.open 打开的中转页标签可以直接关掉；非脚本打开的标签页浏览器会拒绝 close()

@@ -13,6 +13,7 @@ import {
 	isPageInScope,
 	matchDomainHost,
 	matchPathPattern,
+	parseOrigin,
 	resolveInterceptedHref,
 	resolveTarget,
 } from '../../shared/utils/safego.ts'
@@ -193,5 +194,28 @@ describe('buildSafeGoUrl', () => {
 
 	it('参数名可配', () => {
 		assert.equal(buildSafeGoUrl('/jump', 'target', 'https://a.com/', false).startsWith('/jump?target='), true)
+	})
+})
+
+describe('parseOrigin', () => {
+	it('正常来源信息通过', () => {
+		assert.deepEqual(parseOrigin('{"path":"/about","y":627}'), { path: '/about', y: 627 })
+		assert.deepEqual(parseOrigin('{"path":"/","y":0}'), { path: '/', y: 0 })
+	})
+
+	it('空值与非法 JSON 返回 null', () => {
+		assert.equal(parseOrigin(null), null)
+		assert.equal(parseOrigin(undefined), null)
+		assert.equal(parseOrigin(''), null)
+		assert.equal(parseOrigin('not json'), null)
+		assert.equal(parseOrigin('[]'), null)
+	})
+
+	it('脏数据返回 null，绝不把访客送到错误位置', () => {
+		assert.equal(parseOrigin('{"path":"about","y":10}'), null)
+		assert.equal(parseOrigin('{"path":"/about"}'), null)
+		assert.equal(parseOrigin('{"path":"/about","y":"10"}'), null)
+		assert.equal(parseOrigin('{"path":"/about","y":-1}'), null)
+		assert.equal(parseOrigin('{"path":"/about","y":null}'), null)
 	})
 })

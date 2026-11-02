@@ -14,6 +14,38 @@ const DEFAULT_PORTS = new Set(['', '80', '443'])
 const SUSPICIOUS_URL_LENGTH = 160
 const IPV4_PATTERN = /^\d{1,3}(?:\.\d{1,3}){3}$/
 
+/** 记录来源页面位置的 sessionStorage 键（sessionStorage 天然按标签页隔离） */
+export const SAFEGO_ORIGIN_KEY = 'safego:origin'
+
+export interface SafeGoOrigin {
+	/** 来源页面的路径（不含 query/hash），用于返回后确认落点 */
+	path: string
+	/** 点击外链时的滚动位置 */
+	y: number
+}
+
+/**
+ * 解析来源信息；任何不合法输入都返回 null。
+ *
+ * 返回位置这件事值得单独兜一层：脏数据或旧版本残留会把访客送到错误的滚动位置，
+ * 宁可退化成「不校正」也不能乱跳。
+ */
+export function parseOrigin(raw: string | null | undefined): SafeGoOrigin | null {
+	if (!raw)
+		return null
+	try {
+		const value = JSON.parse(raw) as Partial<SafeGoOrigin> | null
+		if (typeof value?.path !== 'string' || !value.path.startsWith('/'))
+			return null
+		if (typeof value.y !== 'number' || !Number.isFinite(value.y) || value.y < 0)
+			return null
+		return { path: value.path, y: value.y }
+	}
+	catch {
+		return null
+	}
+}
+
 /** 去掉尾部斜杠，让 `/go/` 与 `/go` 等价；空串归一成 `/` */
 function normalizePath(path: string) {
 	return path.replace(/\/+$/, '') || '/'
