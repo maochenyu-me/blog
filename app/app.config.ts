@@ -194,9 +194,16 @@ export default defineAppConfig({
 						{ icon: 'tabler:tag', text: '标签', url: '/tags' },
 					],
 				},
-				{ icon: 'tabler:flame', text: '热搜', url: '/hot' },
-				{ icon: 'tabler:message-2', text: '说说', url: '/memos' },
-				{ icon: 'tabler:photo', text: '相册', url: '/gallery' },
+				{
+					icon: 'ph:function-bold',
+					text: '功能集合',
+					url: '#',
+					children: [
+						{ icon: 'ph:lightning-bold', text: '闲言碎语', url: '/memos' },
+						{ icon: 'bxs:hot', text: '热搜', url: '/hot' },
+						{ icon: 'tabler:photo', text: '相册', url: '/gallery' },
+					],
+				},
 				{
 					icon: 'tabler:users',
 					text: '友邻',

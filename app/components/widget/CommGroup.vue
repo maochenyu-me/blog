@@ -2,17 +2,17 @@
 <BlogWidget
 	card
 	dim
-	title="博客/技术社区"
-	bg-img="https://p.qlogo.cn/gh/169994096/169994096/100/"
+	title="Telegram 群组"
+	bg-img="https://cdn.jsdmirror.com/gh/kmoretti/piclist-img@main/img/telegram.webp"
 	bg-aside
 >
 	<div class="title text-creative">
-		纸网接入点
+		塔罗会
 	</div>
 
 	<Tip copy icon :tip-options="{ placement: 'left' }">
-		<Icon name="ri:qq-fill" />
-		<span>169994096</span>
+		<Icon name="ri:telegram-fill" />
+		<span>kemiaochat</span>
 	</Tip>
 </BlogWidget>
 </template>

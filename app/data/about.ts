@@ -9,15 +9,15 @@ import type {
 
 /** 头像两侧的浮动标签 */
 export const aboutTagColumns: AboutTagColumns = {
-	left: ['🐍 Python 数据党', '📈 建模仿真', '☕ 咖啡续命', '🧱 造轮子的人'],
-	right: ['🐱 喵星人', '🌙 夜猫子', '📝 记录踩坑', '🚀 折腾不止'],
+	left: ['博客魔改者', 'ai编程', '天天熬夜中', '随便写写'],
+	right: ['小说爱好者', '资源分享', '日常记录', '开源项目'],
 }
 
 /** 渐变问候卡 */
 export const aboutGreeting: AboutGreeting = {
 	hello: '你好，很高兴认识你 👋',
 	namePrefix: '我是',
-	roles: ['数据科学与仿真', 'Node 脚本'],
+	roles: ['自动化技术与应用', 'ai编程'],
 	highlight: '业余博主',
 }
 
@@ -26,14 +26,14 @@ export const aboutSite: AboutSite = {
 	tips: '我在折腾什么',
 	lines: ['源于', '好奇，'],
 	keywordPrefix: '去',
-	keywords: ['学习', '建模', '仿真', '记录'],
+	keywords: ['学习', '测试', '魔改', '记录'],
 }
 
 /** 座右铭 */
 export const aboutMotto: AboutMotto = {
 	tips: '座右铭',
 	text: '每一段旅行，都有终点。',
-	from: '本站副标题',
+	from: '龙泽尔·爱德华',
 }
 
 /** 技能墙，图标走 Iconify，构建期扫描内联 */
@@ -48,6 +48,12 @@ export const aboutSkills: AboutSkill[] = [
 	{ name: 'LaTeX', icon: 'devicon:latex' },
 	{ name: 'Git', icon: 'devicon:git' },
 ]
+
+/**
+ * 心路历程时间线开关。
+ * 关闭后「心路历程」卡片只保留卡头与 content/about.md 正文，不再渲染里程碑列表。
+ */
+export const aboutMilestonesEnabled = false
 
 /** 心路历程，最新的排最后 */
 export const aboutMilestones: AboutMilestone[] = [

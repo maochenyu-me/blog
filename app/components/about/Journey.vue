@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { aboutMilestones } from '~/data/about'
+import { aboutMilestones, aboutMilestonesEnabled } from '~/data/about'
 
 // 与友链页同构：长文写在 content/about.md，页面只负责渲染
 const { data: post } = await useAsyncData(
@@ -14,7 +14,7 @@ const { data: post } = await useAsyncData(
 		心路历程
 	</p>
 
-	<ol class="milestones">
+	<ol v-if="aboutMilestonesEnabled" class="milestones">
 		<li v-for="milestone in aboutMilestones" :key="`${milestone.time}-${milestone.title}`">
 			<span class="time" v-text="milestone.time" />
 
