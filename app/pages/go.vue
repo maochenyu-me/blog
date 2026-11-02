@@ -54,12 +54,51 @@ function stopTimer() {
 	}
 }
 
+/**
+ * 在新标签页打开外链。
+ *
+ * 返回 false 表示被弹窗拦截（倒计时自动跳转不是用户手势，可能被拦），调用方需退回就地跳转。
+ * 不用 `noopener` 特性串：那样 window.open 恒返回 null，无法判断是否真的开成功；
+ * 改为拿到句柄后手动断开 opener，安全性相同。
+ */
+function openTargetInNewTab(href: string) {
+	try {
+		const opened = window.open(href, '_blank')
+		if (!opened)
+			return false
+		opened.opener = null
+		return true
+	}
+	catch {
+		return false
+	}
+}
+
+/**
+ * 浏览器是否允许在这个时机开新标签。
+ *
+ * 弹窗拦截只认「用户激活」：手动点按钮时有效，倒计时到点的定时器回调里无效
+ * （实测 `window.open` 与程序化 `<a target="_blank">.click()` 都会被拦，返回 null / 不建标签）。
+ */
+function canOpenNewTab() {
+	const activation = navigator.userActivation
+	return !activation || activation.isActive
+}
+
 function jump() {
 	if (!targetInfo.value)
 		return
 	stopTimer()
-	// 用 replace 而非 href：历史栈里不留中转页，外部站点按返回键直接回到博客原位置
-	window.location.replace(targetInfo.value.href)
+	const href = targetInfo.value.href
+	// 在当前标签页里打开外链会把博客文档整个卸载掉：从外链站返回时浏览器只能重新加载整页，
+	// 于是出现「先无样式、随后才补上」的一瞬，滚动位置也保不住。
+	// 改成外链在新标签打开、当前标签退回来源页——博客文档从不卸载，这一整类问题随之消失。
+	if (window.history.state?.back && canOpenNewTab() && openTargetInNewTab(href)) {
+		goBack()
+		return
+	}
+	// 本页是自己新开的标签（无历史可退），或此刻没有用户激活（倒计时自动跳转）：就地跳转
+	window.location.replace(href)
 }
 
 /** 等待路由切回来源页的上限 */
