@@ -12,8 +12,11 @@ import { dateInZone } from '../link-apply/context.ts'
 /** 允许下指令的身份（GitHub 的 comment.author_association） */
 export const trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR']
 
-/** 审核指令关键词：评论里包含它即视为通过 */
-export const commandKeyword = '加入赞助名单'
+/**
+ * 审核指令关键词：评论里包含任意一个即视为通过。
+ * 前一个是现行指令；后一个是为已经在用旧词的 issue 保留的兼容写法。
+ */
+export const commandKeywords = ['添加赞助', '加入赞助名单']
 
 export interface RewardContext {
 	token: string
@@ -53,7 +56,7 @@ export function isTrustedAuthor(ctx: RewardContext): boolean {
 }
 
 export function hasCommand(ctx: RewardContext): boolean {
-	return ctx.commentBody.includes(commandKeyword)
+	return commandKeywords.some(keyword => ctx.commentBody.includes(keyword))
 }
 
 export function loadRewardContext(): RewardContext {

@@ -5,7 +5,7 @@
 
 import type { ApplyState } from './state.ts'
 import process from 'node:process'
-import { deliver } from '../link-apply/gh.ts'
+import { closeIssue, deliver } from '../link-apply/gh.ts'
 import { loadRewardContext } from './context.ts'
 import { appliedComment, conflictComment, failureComment, markers, rejectedComment, skippedComment } from './render.ts'
 import { readState } from './state.ts'
@@ -37,7 +37,16 @@ const pushed = process.env.PUSHED === '1' || ctx.dryRun
 
 async function main(): Promise<void> {
 	if (state.status === 'applied' && state.entry) {
-		await deliver(ctx, markers.applied, pushed ? appliedComment(state.entry, ctx.number) : conflictComment(state.entry))
+		if (!pushed) {
+			await deliver(ctx, markers.applied, conflictComment(state.entry))
+			return
+		}
+		// 先关 issue 再回评：关闭失败就红掉这次 run，绝不留下「已加入且已关闭」的假消息
+		if (ctx.dryRun)
+			process.stdout.write(`--- DRY RUN：关闭 issue #${ctx.number} ---\n`)
+		else
+			await closeIssue(ctx.token, ctx.owner, ctx.repo, ctx.number)
+		await deliver(ctx, markers.applied, appliedComment(state.entry, ctx.number))
 		return
 	}
 	if (state.status === 'noop' && state.entry && state.existing) {

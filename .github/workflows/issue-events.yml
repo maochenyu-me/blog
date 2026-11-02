@@ -1,15 +1,16 @@
 name: Issue 事件 · 友链申请与赞助登记
 
-# 所有「issue 本身变化」的处理都放在这一个文件里：open / close / label / reopen。
+# 所有「issue 本身变化」的处理都放在这一个文件里：open / edit / close / label / reopen。
 # 为什么合并：GitHub 每订阅一个事件就会产生一条 run，即使所有 job 的 if 都不满足也会留一条空记录。
 # 把同一类事件收进一个文件后，一次 issue 操作只会出现一条 run，其余无关 job 显示为 Skipped。
 #
 # 四个 job 各自靠 label 分流，互不干扰：
 # - 友链申请：opened → 预检；closed → 出条目/驳回/收录文案；labeled·reopened → 失联/无效通知
-# - 赞助登记：closed → 待审核摘要（写入动作在 issue-comment.yml，需要人工下指令）
+# - 赞助登记：opened·edited → 待审核摘要（提交后保持开启，改正文摘要跟着刷新；写入动作在
+#   issue-comment.yml，管理员评论「添加赞助」后由机器人写文件并自动关闭 issue，closed 不在这里处理）
 on:
   issues:
-    types: [opened, closed, labeled, reopened]
+    types: [opened, closed, labeled, reopened, edited]
 
 jobs:
   link-preflight:
@@ -106,7 +107,7 @@ jobs:
 
   reward-summary:
     if: >-
-      github.event.action == 'closed' &&
+      (github.event.action == 'opened' || github.event.action == 'edited') &&
       contains(github.event.issue.labels.*.name, '赞助') &&
       github.event.issue.user.type != 'Bot'
     runs-on: ubuntu-latest

@@ -62,6 +62,14 @@ export async function upsertIssueComment(
 	return 'created'
 }
 
+/** 关闭 issue：赞助写入成功后的收尾动作，`state_reason` 固定 completed */
+export async function closeIssue(token: string, owner: string, repo: string, issueNumber: number): Promise<void> {
+	await gh(token, `/repos/${owner}/${repo}/issues/${issueNumber}`, {
+		method: 'PATCH',
+		body: JSON.stringify({ state: 'closed', state_reason: 'completed' }),
+	})
+}
+
 /** 统一出口：DRY_RUN 只打印，CI 里写到 issue 评论 */
 export async function deliver(ctx: IssueContext, marker: string, body: string): Promise<void> {
 	if (ctx.dryRun) {

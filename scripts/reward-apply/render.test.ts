@@ -29,7 +29,7 @@ describe('summaryComment', () => {
 		assert.ok(body.includes('| 名称 | `青柚不加冰` |'))
 		assert.ok(body.includes('| 金额 | ¥66.66 |'))
 		assert.ok(body.includes('![支付截图](https://github.com/user-attachments/assets/abc)'))
-		assert.ok(body.includes('加入赞助名单'))
+		assert.ok(body.includes('添加赞助'))
 	})
 
 	it('外链截图不内联', () => {
@@ -59,7 +59,7 @@ describe('summaryComment', () => {
 			screenshots: [],
 		})
 		assert.ok(body.includes('时间：日期晚于今天'))
-		assert.ok(!body.includes('加入赞助名单」'))
+		assert.ok(!body.includes('添加赞助」'))
 	})
 
 	it('已存在同名同日记录时给出提示', () => {
@@ -80,6 +80,7 @@ describe('结果评论', () => {
 		const body = appliedComment(entry, 42)
 		assert.ok(body.startsWith(markers.applied))
 		assert.ok(body.includes('issue #42'))
+		assert.ok(body.includes('已自动关闭'))
 	})
 
 	it('重复跳过', () => {
@@ -103,5 +104,6 @@ describe('结果评论', () => {
 	it('脚本报错', () => {
 		const body = failureComment('读取文件失败')
 		assert.ok(body.includes('读取文件失败'))
+		assert.ok(body.includes('添加赞助'))
 	})
 })

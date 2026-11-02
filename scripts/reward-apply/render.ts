@@ -102,27 +102,28 @@ export function summaryComment(input: SummaryInput): string {
 	if (input.entry && !input.issues.length) {
 		lines.push(
 			'',
-			'> 管理员审核通过后，在本 issue 回复「加入赞助名单」，机器人会把这条写进 `app/reward.ts` 并自动重新部署。',
+			'> 管理员审核通过后，在本 issue 回复「添加赞助」，机器人会把这条写进 `app/reward.ts`、自动关闭本 issue 并重新部署。',
 		)
 	}
 	else {
 		lines.push('', '> 请修正后**重新提交一份申请**，修好之前不要下写入指令。')
 	}
 
-	lines.push('', '<sub>摘要来自表单解析，作者在关闭后仍可编辑 issue，**请以支付截图为准**。</sub>')
+	lines.push('', '<sub>摘要来自表单解析，作者随时可编辑 issue 正文（摘要会跟着刷新），**请以支付截图为准**。</sub>')
 	return lines.join('\n')
 }
 
 export function appliedComment(entry: CleanEntry, issueNumber: number): string {
 	return [
 		markers.applied,
-		'### 已加入赞助名单 ✅',
+		'### 已加入赞赏名单 ✅',
 		'',
 		`- 名称：${inlineCode(entry.name)}`,
 		`- 金额：${amountText(entry.amount)}`,
 		`- 日期：${entry.date}`,
 		'',
 		`已写入 \`app/reward.ts\`（关联 issue #${issueNumber}），并触发了一次重新部署，关于页稍后即可看到。`,
+		'本 issue 已自动关闭，无需手动处理。',
 	].join('\n')
 }
 
@@ -155,7 +156,7 @@ export function failureComment(message: string): string {
 		'',
 		`- ${inlineCode(message, 200)}`,
 		'',
-		'请管理员查看 Actions 日志；修好后在本 issue 再回复一次「加入赞助名单」即可重试（脚本是幂等的）。',
+		'请管理员查看 Actions 日志；修好后在本 issue 再回复一次「添加赞助」即可重试（脚本是幂等的）。',
 	].join('\n')
 }
 
