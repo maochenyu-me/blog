@@ -89,18 +89,20 @@ function restoreOriginScroll(origin: { path: string, y: number }) {
 	let waited = 0
 	let pinned = 0
 	let released = false
+	let timer: ReturnType<typeof setInterval> | undefined
 
 	function cleanup() {
 		if (released)
 			return
 		released = true
-		clearInterval(timer)
+		if (timer !== undefined)
+			clearInterval(timer)
 		root.style.removeProperty('scroll-behavior')
 		for (const type of SCROLL_RELEASE_EVENTS)
 			window.removeEventListener(type, cleanup)
 	}
 
-	const timer = setInterval(() => {
+	timer = setInterval(() => {
 		if (router.currentRoute.value.path !== origin.path) {
 			waited += 100
 			// 已经锁定过却又离开了来源页，说明读者去了别处，立即收手
@@ -216,8 +218,12 @@ onBeforeUnmount(() => {
 			<Icon name="tabler:alert-triangle" />
 			{{ leaveText }}
 		</h1>
-		<p class="safego-host">{{ targetInfo.host }}</p>
-		<p class="safego-url">{{ targetInfo.href }}</p>
+		<p class="safego-host">
+			{{ targetInfo.host }}
+		</p>
+		<p class="safego-url">
+			{{ targetInfo.href }}
+		</p>
 		<ul v-if="riskItems.length" class="safego-risks">
 			<li v-for="risk in riskItems" :key="risk.kind">
 				<Icon name="tabler:alert-circle" />
@@ -299,20 +305,20 @@ onBeforeUnmount(() => {
 }
 
 .safego-host {
+	overflow-wrap: anywhere;
 	font-size: 1.75rem;
 	font-weight: 700;
 	line-height: 1.2;
 	color: var(--c-primary);
-	overflow-wrap: anywhere;
 }
 
 .safego-url {
+	overflow-wrap: anywhere;
 	margin-top: 0.5rem;
 	font-family: var(--font-monospace);
 	font-size: 0.8rem;
 	line-height: 1.5;
 	color: var(--c-text-3);
-	overflow-wrap: anywhere;
 }
 
 .safego-risks {

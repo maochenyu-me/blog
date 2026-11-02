@@ -64,6 +64,6 @@ export interface SafeGoConfig {
 }
 
 /** 中转页对目标地址的解析结果 */
-export type SafeGoTarget =
-	| { ok: true, href: string, host: string, risks: SafeGoRiskKind[] }
-	| { ok: false, reason: 'missing' | 'malformed' | 'protocol' }
+export type SafeGoTarget
+	= | { ok: true, href: string, host: string, risks: SafeGoRiskKind[] }
+		| { ok: false, reason: 'missing' | 'malformed' | 'protocol' }

@@ -355,4 +355,9 @@ ${packageJson.homepage}
 		url: blogConfig.url,
 		defaultLocale: blogConfig.language,
 	},
+
+	/** 中转页只是站内跳板，不该出现在站点地图里被搜索引擎当作入口页收录 */
+	sitemap: {
+		exclude: ['/go'],
+	},
 })

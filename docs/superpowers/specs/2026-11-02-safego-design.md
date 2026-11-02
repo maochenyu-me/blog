@@ -76,7 +76,9 @@
 ### 4.1 两个刻意的技术选择（已核实，非推测）
 
 **进入中转页用 `router.push`（而非 `replace`）**
-让 `/go` 成为一条独立的历史记录，于是「回到上页」= `router.back()`，并且滚动位置由 Nuxt 默认 `scrollBehavior` 恢复。已核实 `nuxt@4.5.2` 的 `dist/pages/runtime/router.options.js`：`_calculatePosition()` 的第一个分支就是 `if (savedPosition) return savedPosition`，因此返回导航会自动恢复到离开时的滚动位置，**不需要自己记录 scrollTop**。
+让 `/go` 成为一条独立的历史记录，于是「回到上页」= `router.back()`。
+
+> ⚠️ **实施中修正（见 §14.2）**：原方案打算完全依赖 Nuxt 默认 `scrollBehavior` 恢复滚动位置，实测证明**不可靠**——它要等 `page:loading:end` 才落位（本站迟到约 8.5 秒），且用的 `savedPosition` 与点击时的真实位置差 51px。最终改为：拦截时自行把来源页面与滚动位置写入 `sessionStorage`，返回时由中转页恢复并锁定。
 
 **跳出用 `location.replace(target)`（而非 `location.href`）**
 把 `/go` 这条历史记录替换成目标站点。历史栈因此是 `[文章, 目标站点]`，读者在外部站点按浏览器返回键时**直接回到博客文章原位置**，而不是回到中转页——这正是「回到上页」语义能延续到外部站点的关键。
@@ -235,9 +237,9 @@ export interface SafeGoConfig {
 }
 
 /** 目标地址解析结果 */
-export type SafeGoTarget =
-	| { ok: true, href: string, host: string, risks: SafeGoRiskKind[] }
-	| { ok: false, reason: 'missing' | 'malformed' | 'protocol' }
+export type SafeGoTarget
+	= | { ok: true, href: string, host: string, risks: SafeGoRiskKind[] }
+		| { ok: false, reason: 'missing' | 'malformed' | 'protocol' }
 ```
 
 ---
@@ -357,15 +359,19 @@ useSeoMeta({ title: safeGoConfig.text.title, robots: 'noindex, nofollow' })
 ### 8.4 「回到上页」的精确语义
 
 ```
-若 window.history.state?.back 存在：
-    router.back()          // 同标签页普通点击路径；Nuxt 自动恢复滚动位置
-否则：
-    window.close()         // 由 window.open 打开的中转页标签，直接关掉
+若 window.history.state?.back 存在（同标签页普通点击路径）：
+    读取 sessionStorage['safego:origin']（拦截时写入的 { path, y }）
+    router.back()
+    若读到来源位置 → 启动滚动恢复并锁定（见下）
+否则（由 window.open 打开的新标签）：
+    window.close()         // 脚本打开的标签可以直接关掉
     若 window.closed 仍为 false：
         navigateTo('/')    // 直接输入 /go 或手动新开标签的兜底
 ```
 
-依据：`window.history.state.back` 由 Vue Router 在 `push` 时写入，是新开的第三个标签页所不具备的（新标签页没有本站导航历史）；而 `window.close()` 对非脚本打开的标签页会被浏览器拒绝，因此兜底分支是安全的。
+**滚动恢复与锁定**（实施中新增，原因见 §14.2）：等路由真正切回 `origin.path` 之后，每 100ms 校正一次滚动位置，上限 12 秒；期间临时把 `document.documentElement` 的 `scroll-behavior` 设为 `auto`，避免与 Nuxt 迟到的平滑滚动对撞出可见跳动。读者一旦有滚动意图（`wheel` / `touchstart` / `keydown` / `mousedown`）就立即收手，绝不和读者抢滚动条。
+
+依据：`window.history.state.back` 由 Vue Router 在 `push` 时写入，是新开标签页所不具备的；`window.close()` 对非脚本打开的标签页会被浏览器拒绝，因此兜底分支是安全的。
 
 ### 8.5 无障碍
 
@@ -526,3 +532,77 @@ useSeoMeta({ title: safeGoConfig.text.title, robots: 'noindex, nofollow' })
 | 捕获阶段拦截误伤既有交互 | 低 | 已核实图片灯箱绑在 `<img>` 上；只处理 http(s) 绝对地址；提供 `data-safego-ignore` 与 `ignoreAttrs` |
 | 中转页的 View Transition 与 `article-transition.client.ts` 冲突 | 低 | 该插件在找不到 `[data-transition-key]` 共享元素时直接提前返回；`/go` 不使用该属性 |
 | 大量外链页面上监听器带来的性能开销 | 极低 | 单个 `document` 级委托监听，无逐元素绑定 |
+
+---
+
+## 14. 实施后的实测结论（2026-11-02）
+
+环境：`localhost:3000`（本机 dev server 只监听 IPv6）、Chromium 156、browser-skill 驱动。
+
+### 14.1 验收结果
+
+| 验收项 | 实测值 |
+| --- | --- |
+| 主流程 | `/about` 点 `https://www.zhilu.site` → `/go?u=https%3A%2F%2Fwww.zhilu.site%2F`，页面显示域名 `www.zhilu.site`、完整地址、倒计时、两个按钮；`history.state.back === '/about'` |
+| 「回到上页」滚动恢复 | 点击前 `scrollY=627` → 返回后 **627**，且 Nuxt 迟到写入（12.7s）之后仍为 **627** |
+| 倒计时自动跳转 | `/go?u=https://example.com/` 10 秒后标签页 URL 变为 `https://example.com/` |
+| `location.replace` 语义 | 跳转后浏览器后退一步落在 `http://localhost:3000/about`（历史里没有 `/go`） |
+| 修饰键 / 中键 | Ctrl+左键、鼠标中键都新开标签页 `http://localhost:3000/go?u=https://www.zhilu.site/` |
+| 白名单豁免 | 把 `zhilu.site` 临时加入 `links.domains` 后，点击该链接不再进 `/go`（验证后已还原） |
+| 站内链接豁免 | `/about` 点 `a[href="/message"]` 直达 `/message` |
+| 失败态 | `/go?u=javascript:alert(1)` 与 `/go`（缺参）都渲染失败态，**没有**「直接跳转」按钮，标题「这个中转链接无效」 |
+| 风险提示 | `http://127.0.0.1:8080/some/path` 同时命中「HTTP 明文传输」「IP 地址」「非标准端口」三条 |
+| 水合 | 控制台**无 hydration mismatch 警告**；SSR HTML 渲染骨架（4 条骨架线），不含 `safego-host`（目标地址只出现在 Nuxt payload 里） |
+| 暗色模式 | 卡片底 `rgb(41,44,50)`、域名 `rgb(209,219,250)`、风险提示 `rgb(221,136,85)`，全部走 CSS 变量 |
+| 断点 | 1080 / 768 / 528 三档 `scrollWidth === clientWidth`（无横向溢出），卡片宽 560 / 560 / 496 |
+| `pauseWhenHidden` | 标签页隐藏时倒计时停在 5 不动（实测确认） |
+| 读者滚动即释放锁定 | 返回后 `y=627` → 滚轮 400 → `y=1027`，6 秒后仍为 1027（未被拉回） |
+| `pnpm lint` | 本次新增/修改的全部文件 0 error（仓库其余文件存在改动前就有的既有问题，未触碰） |
+| 全量测试 | `node --test "scripts/**/*.test.ts"` → **195 passed / 0 failed**（基线 161 + 本次新增 34） |
+| `pnpm generate` | 成功，**Prerendered 47 routes**，0 prerender error；`.output/public/go/index.html` 含 `noindex, nofollow`；sitemap 中 `/go` 条目数为 0 |
+
+### 14.2 实施中发现并修掉的两个真问题（原方案没有预料到）
+
+**① `<NuxtPage v-once>` 会让「切到自定义布局」的页面渲染成空白**
+
+`app/app.vue` 原本是 `<NuxtPage v-once :page-key="route => normalizeContentPath(route.path)" />`。`v-once` 缓存的不只是 props 求值，而是 NuxtPage 的整个 VNode；当路由切到使用**自定义布局**的页面（`/go` 的 `safego` 布局）时，布局组件被整体替换，那个被缓存的 VNode 无法在新父节点下重新挂载，`<slot>` 里就只剩一条注释——页面全白。
+
+- 证据：客户端导航进入 `/go` 后 `document.querySelector('main').innerHTML` 长度仅 66（`<main class="layout-safego"><!-- … --></main>`），控制台出现 `Hydration class mismatch on div.about.proper-height … expected on client: class="safego"`；而**直接加载** `/go` 完全正常，站内导航（`/link` → `/message`）也完全正常。
+- 修法：把 `page-key` 提到模块级变成稳定引用（内联箭头函数每次渲染都是新引用，这才是当初要 `v-once` 的原因），然后去掉 `v-once`。两个目的同时成立，并且修掉了主题里一个潜在 bug——**任何**将来使用自定义布局的页面都会踩。
+- 影响面：`app/app.vue` 是全站每次导航都会用到的文件，已回归验证站内导航正常。
+
+**② Nuxt 默认 `scrollBehavior` 在本项目里既晚又偏，不能作为唯一依据**
+
+实测时间线（返回后逐 100ms 采样 `window.scrollY`）：
+
+```
+t=3.7s   路由切回 /about，内容随后渲染完成，y=0
+t=3.4s … 12.7s   y 一直是 0（约 8.5 秒没有任何滚动）
+t=12.9s  平滑滚动开始（87 → 459 → 568）
+t=13.8s  停在 576          ← 目标是 627，偏 51px
+```
+
+Nuxt 的 `scrollBehavior` 返回一个 Promise，要等 `page:loading:end` 才落位；本站该事件被侧栏 Visitor 的慢接口拖到 8 秒以上。因此改为自己记录、自己恢复：拦截时把 `{ path, y }` 写进 `sessionStorage`，返回后按 §8.4 锁定。
+
+- 第一版实现还踩了一个坑：循环在「路由还没切回来源页」时就判断「已离开 → 收手」，导致循环在第一个 tick 自杀、一次都没生效。改为**先等路由匹配，再开始锁定**。
+- 附带：锁定期间把 `scroll-behavior` 临时设为 `auto`，否则与 Nuxt 的平滑滚动对撞会出现可见跳动。
+
+### 14.3 仍未验证 / 已知限制
+
+| 项 | 状态 |
+| --- | --- |
+| 大型文章页（`/2026/example`，348 个可交互节点、含两个视频 iframe）的滚动恢复 | **未实测**。该页在 dev 环境下每次观察都要传回数万字节 VOM，且首屏懒加载内容多，位置恢复的稳定性存疑。已在 `/about` 上验证机制本身 |
+| 移动端真机触摸 | 未测。`touchstart` 释放分支只有代码保证 |
+| 评论系统 iframe 内的链接 | 已知拦不到（跨域 iframe 不在本站文档树内） |
+| 右键「复制链接地址」 | 得到原始外链，无法规避（运行时拦截不改写 href） |
+| 中转页在 375px 视口 | 该档 emulate 取证失败未取到数据；528px 档已确认无溢出 |
+
+---
+
+## 15. 与实施计划的偏差
+
+`docs/plans/2026-11-02-safego.md` 是把计划当执行蓝图用的，实际执行有两处偏差，均记录在此：
+
+1. **计划 Task 5 与 Task 6 合并为一次写入**（页面骨架与交互一起实现），验证项一个没少；中间态提交省略，不影响可回溯性。
+2. **计划里没有的两项额外改动**：`app/app.vue` 的 `v-once` 修复（见 §14.2 ①），以及拦截器/中转页里的滚动位置记录与锁定（见 §14.2 ②）。这两项都是实测暴露出来的，属于「隐藏复杂度使任务升级」的情形，已按 §14.2 记录完整证据。
+3. 计划 Task 8 要求「路由数比改动前多 1」——实际 `Prerendered 47 routes`，未在改动前记录基线数，以「`/go/index.html` 存在且 sitemap 排除」作为等效判据。
