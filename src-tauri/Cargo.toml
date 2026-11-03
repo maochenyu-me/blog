@@ -1,0 +1,29 @@
+[package]
+name = "meowlo-app"
+version = "0.1.0"
+description = "喵洛阁 App"
+authors = ["克喵"]
+edition = "2021"
+rust-version = "1.90"
+
+[lib]
+name = "meowlo_app"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tar = "0.4"
+flate2 = "1"
+mime_guess = "2"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+
+# 单实例仅桌面端支持；放在 target 下可避免移动端编译失败
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
