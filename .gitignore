@@ -26,3 +26,16 @@ logs
 # Custom
 .vercel
 content/posts/test.md
+
+# App 内容包产物（.output 整目录已忽略，这里显式写死：将来调整 .output 规则时内容包也不会误提交）
+.output/public/app-dist/
+
+# tauri icon 在缺少 src-tauri/gen/ 时的兜底产物（移动端图标应进 gen/，不该进仓库）
+src-tauri/icons/android/
+src-tauri/icons/ios/
+
+# Rust 构建产物（src-tauri/gen/ 是脚手架，需要提交，不在此列）
+src-tauri/target/
+
+# app 构建链路生成的内容包种子（beforeBuildCommand 产出的 content.tar.gz，约 11 MB）
+src-tauri/seed/
