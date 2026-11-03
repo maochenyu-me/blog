@@ -1,0 +1,278 @@
+name: Build app (Tauri v2)
+
+# App 构建链路（桌面三端 + Android + iOS）。与 deploy-cloudflare-pages.yml 的分工：
+# - 本工作流：只产 artifact，不建 GitHub Release、不生成 app-dist（保持二进制干净）
+# - 部署工作流：站点构建链路，pnpm generate 之后额外生成 app-dist 内容包
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - 'scripts/app/**'
+      - 'app/**'
+      - 'blog.config.ts'
+      - 'nuxt.config.ts'
+      - 'content.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/build-app.yml'
+  # PR 上只跑与 app 直接相关的路径，避免每改一篇文章就烧四台 runner
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - 'scripts/app/**'
+      - '.github/workflows/build-app.yml'
+  # 手动触发：仓库 → Actions → Build app (Tauri v2) → Run workflow
+  workflow_dispatch:
+
+concurrency:
+  group: build-app-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 1/4 最快反馈：几分钟内暴露 Rust 编译错误 ─────────────────────────────
+  # 本地无法编译 Rust（用户不装环境），这个 job 是唯一的早期反馈通道。
+  # 只跑 cargo check/test，不打包；Windows 覆盖最常用的目标平台。
+  check:
+    name: cargo check
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        # Rust 需要 >= 1.90（Tauri 2.12.x 基线），stable 当前已高于该基线
+        uses: dtolnay/rust-toolchain@stable
+
+      # tauri-build 的 build.rs 在 cargo check 阶段就会执行，并按 bundle.resources
+      # 拷贝 src-tauri/seed/ 下的文件，缺任何一个都直接 exit(1)（tauri-build 源码
+      # copy_file 已逐行核实）。真正的 seed 由 beforeBuildCommand 生成，但
+      # cargo check 不会执行 beforeBuildCommand，所以这里必须先造一个结构合法的
+      # 占位 seed 让构建脚本通过。想删掉这一步时：先确认 tauri-build 已不再在
+      # check 阶段拷贝 bundle.resources，否则 check 必红。
+      # frontendDist 指向已提交进 git 的 src-tauri/stub/，无需任何占位。
+      - name: Create placeholder seed for tauri-build
+        shell: bash
+        run: |
+          mkdir -p src-tauri/seed
+          printf '{}' > src-tauri/seed/manifest.json
+          tar -czf src-tauri/seed/content.tar.gz -C src-tauri/stub index.html
+
+      - name: cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      # Rust 单元测试（webroot 4+2 条断言、content_update 6 个测试）本机没有
+      # Rust 环境跑不了，只能在这里跑 —— check job 因此兼作单元测试 gate。
+      # 占位 seed 同样满足测试所需的文件存在性（测试不校验内容包真伪）。
+      - name: cargo test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  # ── 2/4 桌面三端：只出安装包 + workflow artifact，不建 Release ───────────
+  desktop:
+    name: desktop (${{ matrix.platform }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            artifact_prefix: windows
+          - platform: ubuntu-22.04
+            artifact_prefix: linux
+          - platform: macos-14
+            artifact_prefix: macos
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # 与 package.json 的 packageManager 字段保持一致（pnpm@12.5.1）
+          version: 12.5.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # 依赖取官方两份列表的并集（GitHub pipeline 页 + Debian 页）。
+      # 用 ubuntu-22.04 是因为 glibc 基线（官方理由），不是「24.04 的 webkit 坏了」。
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      # only build / no release：省略 tagName、releaseName、releaseId，
+      # 只把产物挂成 workflow artifact。
+      # @tauri-apps/cli 已由 pnpm-workspace.yaml 的 catalog 声明并锁进
+      # pnpm-lock（2.12.4），pnpm install 后 tauri-action 直接使用项目内 CLI。
+      - name: Build bundles
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: '${{ matrix.artifact_prefix }}-[arch]-[bundle]'
+          # v1 里 v0 的 includeUpdaterJson 改名成 uploadUpdaterJson；本方案不做本体更新，两个都关
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
+
+      # 守住「app 构建链路不生成 app-dist」这条不变量（设计 D4 / 验收 S12）
+      - name: Assert app-dist was not generated
+        shell: bash
+        run: |
+          if [ -e .output/public/app-dist ]; then
+            echo "::error::app 构建链路不应生成 .output/public/app-dist"
+            ls -la .output/public/app-dist
+            exit 1
+          fi
+
+  # ── 3/4 Android：debug APK，可直接装真机 ────────────────────────────────
+  android:
+    name: android (debug apk)
+    needs: check
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # JDK 21：Gradle 要求 JVM 17–27，而 Tauri 的映射表上限是 26，21 是安全区
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 非交互环境下缺 ANDROID_HOME / NDK_HOME，tauri android build 会直接 bail，
+      # 所以两个变量都显式写进 GITHUB_ENV。
+      # build-tools 不显式安装：AGP 默认 sdkDownload=true 会自己补下；
+      # 若首轮报 "Failed to find Build Tools revision x.y.z"，再补一条 sdkmanager --install。
+      - name: Install Android SDK / NDK
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "platform-tools" \
+            "platforms;android-37" \
+            "ndk;29.0.13846066"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/29.0.13846066" >> "$GITHUB_ENV"
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      # gen/android 里烘焙着移动端图标（tauri icon 的产物，已随仓库提交）。
+      # 重跑 init 会把图标覆盖回 Tauri 默认图标，所以只在 gen/ 缺失时才 init。
+      - name: Init Android project
+        if: ${{ hashFiles('src-tauri/gen/android/**') == '' }}
+        run: pnpm exec tauri android init --ci
+
+      # --debug 走 debug keystore，产物可直接装真机（验收 S10）；
+      # release 产物是 app-universal-release-unsigned.apk，未签名装不上。
+      - name: Build debug APK
+        run: pnpm exec tauri android build --apk --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  # ── 4/4 iOS：未签名 IPA（无 Apple 账号） ────────────────────────────────
+  ios:
+    name: ios (unsigned ipa)
+    needs: check
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 同 Android：gen/apple 里烘焙着 iOS 图标，已提交时不要重跑 init
+      - name: Init iOS project
+        if: ${{ hashFiles('src-tauri/gen/apple/**') == '' }}
+        run: pnpm exec tauri ios init --ci
+
+      # cli >= 2.11.0 的 --no-sign：内部传 CODE_SIGNING_ALLOWED=NO 等参数，无需 Apple 账号；
+      # 产出的 IPA 未签名，不能直接装正常 iPhone（验收 S11 只验构建成功 + 产物存在）。
+      - name: Build unsigned IPA
+        run: pnpm exec tauri ios build --no-sign
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: |
+            src-tauri/gen/apple/build/**/*.ipa
+            src-tauri/gen/apple/build/**/*.xcarchive
+          if-no-files-found: error
+          retention-days: 30
