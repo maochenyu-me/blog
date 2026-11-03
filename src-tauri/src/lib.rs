@@ -123,3 +123,9 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+// 移动端必需：生成 JNI 入口符号（Android 的 libmeowlo_app.so 校验运行时符号，
+// 缺它会在 Gradle 的 rustBuild* 任务报 "does not include required runtime
+// symbols"——CI 第 4 轮实锤）。桌面端由 main.rs 直接调 run()，不需要该宏。
+#[cfg(target_os = "android")]
+tauri::mobile_entry_point!(run);
