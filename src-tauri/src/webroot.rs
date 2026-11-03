@@ -54,6 +54,11 @@ pub fn normalize_request_path(raw: &str) -> Option<String> {
     if decoded.contains('\0') {
         return None;
     }
+    // Windows 盘符段（如 `C:/Users/...`）会使 `Path::join` 因带 prefix 替换基底而逃逸 web 根；
+    // NTFS 文件名本身禁止 `:`，合法静态资源不含它，顺带挡住 ADS（`file:stream`）。
+    if decoded.contains(':') {
+        return None;
+    }
     let mut parts: Vec<&str> = Vec::new();
     for seg in decoded.split('/') {
         match seg {
@@ -167,6 +172,9 @@ mod tests {
         // 编码过的穿越也要挡
         assert!(normalize_request_path("/%2e%2e/secret").is_none());
         assert!(normalize_request_path("/a%5c..%5cb").is_none());
+        // Windows 盘符段：绝对形态与含 `:` 的普通段
+        assert!(normalize_request_path("/C:/Users/x").is_none());
+        assert!(normalize_request_path("/a:b").is_none());
     }
 
     #[test]

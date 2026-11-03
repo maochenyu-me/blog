@@ -84,6 +84,11 @@ pub fn validate_manifest(m: &Manifest) -> Result<(), String> {
         if rel.starts_with('/') || rel.split('/').any(|s| s == "..") || rel.contains('\\') {
             return Err(format!("清单包含非法路径: {rel}"));
         }
+        // Windows 盘符路径属于绝对路径（`C:/x` 与盘符相对的 `C:x` 都会因带
+        // prefix 使 `Path::join` 替换基底而逃逸 web_base），一并拒绝。
+        if rel.as_bytes().get(1) == Some(&b':') {
+            return Err(format!("清单包含非法路径: {rel}"));
+        }
         if hash.len() != 64 {
             return Err(format!("文件 {rel} 的哈希格式非法"));
         }
@@ -375,6 +380,18 @@ mod tests {
     fn rejects_uppercase_build() {
         let mut m = sample();
         m.build = "8C1F0A2B3D4E5F60".into();
+        assert!(validate_manifest(&m).is_err());
+    }
+
+    #[test]
+    fn rejects_windows_drive_letter_paths() {
+        // 盘符绝对路径：C:/evil
+        let mut m = sample();
+        m.files.insert("C:/evil".into(), "c".repeat(64));
+        assert!(validate_manifest(&m).is_err());
+        // 盘符相对路径：C:evil（Path::join 同样替换基底）
+        let mut m = sample();
+        m.files.insert("C:evil".into(), "c".repeat(64));
         assert!(validate_manifest(&m).is_err());
     }
 }
