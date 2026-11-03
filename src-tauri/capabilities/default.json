@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "默认能力：窗口焦点、事件监听与外部链接打开",
+  "windows": ["main"],
+  "permissions": ["core:default", "opener:default"]
+}
