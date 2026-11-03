@@ -35,7 +35,7 @@
 
 | 术语 | 含义 |
 | --- | --- |
-| 内容包 | 一份 Nuxt 静态产物（`.output/public`）的 zip + 清单，用于热更新 |
+| 内容包 | 一份 Nuxt 静态产物（`.output/public`）的 tar.gz + 清单，用于热更新 |
 | 构建指纹 `build` | 内容包的版本标识（内容哈希），app 用它判断是否需要更新 |
 | 内嵌资源 | 编译期打进二进制的 Nuxt 产物（`frontendDist`） |
 | web 根 | 当前实际服务给 WebView 的目录：下载的内容包目录，或回退到内嵌资源 |
@@ -52,7 +52,7 @@
 | S2 | 客户端内站内跳转不触发整页重载（Nuxt 客户端路由生效），`_payload.json` 预取无报错 | 实测 + DevTools Console 无 error |
 | S3 | 发布新文章并重新部署后，客户端启动能检测到 `build` 变化，提示「有新内容」 | 改内容 → 部署 → 启动客户端 |
 | S4 | 点击更新后下载内容包、校验通过、切换、重载，新文章可见；旧版本目录保留 | 实测 + 检查 `appData` 目录 |
-| S5 | 内容包被篡改（改一个字节）时**拒绝应用**并保留当前版本，给出明确错误文案 | 手工改 zip 后实测 |
+| S5 | 内容包被篡改（改一个字节）时**拒绝应用**并保留当前版本，给出明确错误文案 | 手工改压缩包后实测 |
 | S6 | 新内容包解压后缺少 `index.html` 时不切换，自动回滚到上一版 | 构造坏包实测 |
 | S7 | 闭网时点「检查更新」不报错、不弹失败弹窗，静默保持当前内容 | 断网实测 |
 | S8 | 外链（`https://github.com/...`）点击后在**系统浏览器**打开，不在 WebView 内跳走 | 实测 |
@@ -61,7 +61,7 @@
 | S11 | iOS 由 CI 产出未签名 IPA（不验安装可用性，只验构建成功 + 产物存在） | CI artifact |
 | S12 | `app.enable = false` 时 `pnpm generate` 与现有部署流程行为完全不变，站点产物无 app 相关新增文件 | 关开关后 generate + diff |
 | S13 | `pnpm lint` 通过；Nuxt 侧 app 组件在浏览器 `localhost:3000` 下不渲染任何 app-only 元素 | 命令行 + 浏览器 |
-| S14 | 内容包 zip 不包含 `app-dist/` 自身（无自引用膨胀），体积与文件数符合预期 | 检查生成物 |
+| S14 | 内容包 tar.gz 不包含 `app-dist/` 自身（无自引用膨胀），体积与文件数符合预期 | 检查生成物 |
 | S15 | CI 的 `cargo check` job 单独存在且先跑，能在数分钟内给出编译结果 | CI 运行记录 |
 
 ---
@@ -93,16 +93,16 @@ Tauri 的 `frontendDist` 是**编译期**量，运行时改不了；把新内容
 
 理由很实际：**本机装不了 Rust，我无法在本地捕获编译错误**（用户选择 Q7=B：不装环境，全靠 CI 构建）。因此要尽一切努力压低 Rust 侧面积与依赖数量。
 
-- JS 侧用普通 `fetch` 拿 `manifest.json` 和 zip（走 WebView 网络栈，顺带免费获得本机代理支持）。
+- JS 侧用普通 `fetch` 拿 `manifest.json` 和压缩包（走 WebView 网络栈，顺带免费获得本机代理支持）。
 - Rust 侧只暴露四个命令：`content_status`、`content_check`、`content_apply`、`content_rollback`，外加协议处理器。
-- 下载与解压仍在 Rust 侧用 `reqwest`(rustls) + `zip` + `sha2`，避免把 3–4 MB 二进制经 IPC 传进 Rust（Tauri v2 的 IPC 默认走 JSON，大二进制会 base64 膨胀）。
+- 下载与解压仍在 Rust 侧用 `reqwest`(rustls) + `tar` + `flate2` + `sha2`，避免把 3–4 MB 二进制经 IPC 传进 Rust（Tauri v2 的 IPC 默认走 JSON，大二进制会 base64 膨胀）。
 
 ### D4 内容包只在部署链路生成，不进 app 二进制
 
 两个链路共用一个 `pnpm generate`，但目的不同：
 
 - **app 构建链路**：`frontendDist` = `../.output/public`，此时**没有** `app-dist/`，二进制干净。
-- **站点部署链路**：generate 之后再跑 `scripts/app/gen-content-bundle.ts`，把 zip + manifest 写进 `.output/public/app-dist/`，随站点一起部署。
+- **站点部署链路**：generate 之后再跑 `scripts/app/gen-content-bundle.ts`，把 tar.gz + manifest 写进 `.output/public/app-dist/`，随站点一起部署。
 
 必须用**显式独立步骤**而不是 Nuxt 构建钩子或 `postgenerate`：pnpm 默认不执行 `pre`/`post` 生命周期脚本，指望 `postgenerate` 会静默失效。
 
@@ -110,7 +110,7 @@ Tauri 的 `frontendDist` 是**编译期**量，运行时改不了；把新内容
 
 ### D5 内容包生成时必须排除 `app-dist/` 自身
 
-zip 的输出目录若位于被压缩目录内部，会把正在写入的 zip 打进去，造成自引用膨胀甚至无限增长。脚本必须显式排除 `app-dist/`。（对应验收 S14）
+压缩包输出目录若位于被压缩目录内部，会把正在写入的压缩包打进去，造成自引用膨胀甚至无限增长。脚本必须显式排除 `app-dist/`。（对应验收 S14）
 
 ### D6 图标：体素头为主图标，按平台分层输出
 
@@ -168,7 +168,7 @@ Nuxt 4 SSG ──pnpm generate──► .output/public (388 files, 11 MB)
               ▼                                            ▼
    【编译期内嵌 frontendDist】                  【部署链路：内容包生成】
    离线开箱可用，首次启动零下载                   app-dist/manifest.json
-              │                                  app-dist/content.zip
+              │                                  app-dist/content.tar.gz
               │                                            │
               │                                            ▼
               │                              Cloudflare Pages  /app-dist/
@@ -194,7 +194,7 @@ Nuxt 4 SSG ──pnpm generate──► .output/public (388 files, 11 MB)
 | 层 | 职责 | 不负责 |
 | --- | --- | --- |
 | Nuxt 构建层 | 产出静态站点；app 构建时开关不影响站点产物 | 打包、更新 |
-| 内容包层 | 把静态产物打成 zip + 清单，随站点部署 | 下载、切换 |
+| 内容包层 | 把静态产物打成 tar.gz + 清单，随站点部署 | 下载、切换 |
 | Tauri/Rust 层 | 服务资源、管理 web 根、内容包的生命周期 | 决定"要不要更新"（由前端触发） |
 | app UI 层 | 展示当前状态、触发检查、给出可操作提示 | 直接读写文件 |
 
@@ -221,8 +221,8 @@ idle ──check──► has_update ──download──► downloaded ──ap
   └──(断网/请求失败)──► idle（静默，不打扰）
 ```
 
-- **校验**：zip 整体 sha256 + 逐文件 sha256（对照 manifest）双重校验
-- **解压安全**：拒绝含 `..` 的路径条目（zip-slip），拒绝绝对路径，限制解压后总大小
+- **校验**：压缩包整体 sha256 + 逐文件 sha256（对照 manifest）双重校验
+- **解压安全**：拒绝含 `..` 的路径条目（路径穿越），拒绝绝对路径，限制解压后总大小
 - **原子切换**：解压到 `<appData>/web/<build>.tmp/` → 校验通过 → 重命名为 `<build>/` → 写 `active.json`（单文件原子替换）→ 重载 webview
 - **回滚**：`active.json` 里保留 `previous`；新版本启动后前端上报 `ready` 失败（或协议层读不到 `index.html`）则自动切回 `previous`
 
@@ -239,7 +239,7 @@ blog/blog/
 │   │   └─ AppBootError.vue                # 内容包损坏时的可操作错误页
 │   └─ plugins/app-bridge.client.ts        # 检测 window.__TAURI__，封装 invoke
 ├─ scripts/app/
-│   ├─ gen-content-bundle.ts               # zip + manifest（排除 app-dist 自身）
+│   ├─ gen-content-bundle.ts               # tar.gz + manifest（排除 app-dist 自身）
 │   ├─ gen-icons.ts                        # SVG → PNG / Android 分层 / iOS 压平
 │   └─ svg/                                # 矢量源（唯一的图标设计源）
 ├─ src-tauri/
@@ -345,7 +345,7 @@ export const app = {
 pnpm exec unrun scripts/app/gen-content-bundle.ts
 ```
 
-它读写 `.output/public` 并生成 `.output/public/app-dist/{manifest.json,content.zip}`，随后随整站一起部署。
+它读写 `.output/public` 并生成 `.output/public/app-dist/{manifest.json,content.tar.gz}`，随后随整站一起部署。
 
 **风险声明**：这是对**线上部署工作流**的修改，必须谨慎，并准备好回滚（回滚 = 删掉这一行 step，内容包不再生成，app 端表现为"永远检测不到更新"但功能不受损）。
 
@@ -365,7 +365,7 @@ pnpm exec unrun scripts/app/gen-content-bundle.ts
   | `netease.518339.xyz` | 网易云 |
   | `t0.gstatic.cn` / `s4.zstatic.net` / `cdn.jsdmirror.com` / `fonts.bytedance.com` | 字体与图标 CDN |
 
-- **内容包完整性**：zip sha256 + 逐文件 sha256 双重校验，任一不符即拒绝。
+- **内容包完整性**：压缩包 sha256 + 逐文件 sha256 双重校验，任一不符即拒绝。
 - **解压安全**：拒绝 `..`、绝对路径、超限体积。
 - **不加 `dangerousDisableAssetCspModification`、不开 `freezePrototype: false` 以外的放宽**。
 - **凭据**：本方案不涉及任何密钥入库；若将来做 release 签名，keystore 与密码一律走 GitHub Secrets 占位符，不进仓库。
@@ -387,7 +387,7 @@ pnpm exec unrun scripts/app/gen-content-bundle.ts
 2. DevTools 看 Console 无 error，站内跳转无整页重载（S2）
 3. 部署新内容后启动，出现更新提示（S3）
 4. 更新成功、新文章可见、旧目录保留（S4）
-5. 篡改 zip 字节 → 拒绝应用（S5）
+5. 篡改压缩包字节 → 拒绝应用（S5）
 6. 构造缺 `index.html` 的包 → 不切换（S6）
 7. 断网点检查更新 → 静默（S7）
 8. 点外链 → 系统浏览器打开（S8）
@@ -409,7 +409,7 @@ pnpm exec unrun scripts/app/gen-content-bundle.ts
 
 | # | 风险 / 未证实 | 影响 | 应对 |
 | --- | --- | --- | --- |
-| R1 | **本地无法编译 Rust**，首轮 CI 通过不保证 | 高 | Rust 面积最小化；`cargo check` 独立 job 先跑；依赖只留 `reqwest`/`zip`/`sha2`/`mime_guess` |
+| R1 | **本地无法编译 Rust**，首轮 CI 通过不保证 | 高 | Rust 面积最小化；`cargo check` 独立 job 先跑；依赖只留 `reqwest`/`tar`+`flate2`/`sha2`/`mime_guess` |
 | R2 | 自定义协议在 iOS 上的行为未验证（无设备） | 中 | iOS 只交付脚手架 + CI 构建；机制与 Android 同源，Android 验证通过可大幅降低风险 |
 | R3 | `_payload.json` 在自定义协议下的预取行为未证实 | 中 | Windows 实测；若失败则对该构建启用 `experimental.payloadExtraction: false` |
 | R4 | 官方 Nuxt 指引要求 `ssr: false`，但本站是真 SSG | 低 | 不改现有 SSG 形态（真 HTML 首屏优于 SPA）；实测为准 |
@@ -456,3 +456,40 @@ pnpm exec unrun scripts/app/gen-content-bundle.ts
 2. **应用标识确定**：`identifier = top.kemeow.blog`，`productName = 喵洛阁`。一旦发布不宜更改，后续一律以此为准。
 3. **移动端热更新要做**（用户明确不接受"移动端 v1 降级"）。因此 Android 与 iOS 走与桌面**完全相同**的 web 根机制；Android 由用户提供真机验收（S10），iOS 因无设备仅验 CI 构建产出（S11）。
 4. **图标选定体素头方案（B）**；镰月（A）与场景（C）作为备选视觉素材保留在设计源目录。
+
+---
+
+## 15. 实施计划阶段的修订（2026-11-03）
+
+以下三处由 Lead 在编写实施计划、审查合并稿时裁决并已落地到 `docs/plans/2026-11-03-tauri-app.md`。**本文档前述章节与本节冲突时，以本节为准。**
+
+### 15.1 内容包格式：`.zip` → `.tar.gz`
+
+原因有三：本机环境**没有 `zip` 命令**（实测只有 `tar` 与 `gzip`，见下）；Node 用内置 `node:zlib` 即可生成 tar.gz，**不新增任何依赖**；Rust 侧配合清单白名单校验解压，比手写 zip-slip 防护更安全。
+
+因此：产物为 `app-dist/{manifest.json,content.tar.gz}`，Rust 侧依赖为 `tar` + `flate2`（不再用 `zip` crate）。本文档§2、§5.3、D2、D5、§8.3、S5、S14 里所有 `zip` 字样均按 `tar.gz` 阅读，已就地替换。
+
+### 15.2 首启内容的来源：`asset_resolver` 回退 → **seed resource**
+
+原 D1 写的是「web 根找不到时回退到 `app.asset_resolver().get()` 读内嵌资源」。审查时发现两个问题：
+
+1. **真实缺口**：原设计的回退目录从未被任何代码填充，首次启动会对所有请求返回 404 —— 也就是 S1「断网可读」根本达不到。
+2. **API 不确定性**：`asset_resolver()` 的文档说它「默认推断应用自己的 URL scheme」；而本项目 WebView 走自定义 scheme `app`，两者不一致时该 API 的键格式与命中行为**无法在本机验证**（本机无 Rust，只能等 CI）。
+
+改法：把首启内容做成 Tauri resource（`bundle.resources` 里的 `seed/`），首启解包到 appData，此后**永远只从磁盘服务**。
+
+- `build.frontendDist` 改为 `"stub"`（指向提交进 git 的 `src-tauri/stub/index.html`），站点内容不再经 `frontendDist` 分发 —— 应用二进制里只保留一份内容（否则会同时内嵌 11 MB 站点与一份 3–4 MB 种子）。
+- 种子生成挂在 `beforeBuildCommand`：`pnpm generate && pnpm exec unrun scripts/app/gen-content-bundle.ts --out src-tauri/seed`。
+
+收益：只用 `bundle.resources` + `BaseDirectory::Resource` 两个长期稳定的 API，**零不确定性**；且种子与网络更新包**格式完全相同**，走同一套校验/解包/原子切换代码 —— 首启就顺带验证了更新机制。代价：首启多一次约 1 秒的解压。
+
+### 15.3 Linux 发行包：v1 移除 `deb`
+
+`tauri-bundler` 的 `bundle/linux/debian.rs` 用 `heck::AsKebabCase(productName)` 生成 `Package:`。CJK 字符在 heck 里算「无大小写的字母」不会被剥离，因此产品名「喵洛阁」极可能产出 `Package: 喵洛阁`；而 Debian 策略要求包名只能是 `[a-z0-9][a-z0-9+.-]+`，`dpkg -i` 会拒绝安装。更关键的是 `bundle.linux.deb` **没有**包名覆写字段，所以没有「改个配置就好」的选项。
+
+→ v1 的 `bundle.targets` 为 `["nsis", "appimage", "dmg"]`，**Linux 只发 AppImage**。将来若上游补了覆写字段、或把 `productName` 改成 ASCII，再把 `deb` 加回即可。对应地，§6 里方案文档提到的 `AcoFork_0.1.0_amd64.deb` 类比产物不再存在。
+
+### 15.4 顺带明确的两处
+
+- `blog.config.ts` 里**不再有** `keepPreviousBuilds`：四个 Rust 命令没有传参入口，那是悬空配置。Rust 固定保留 1 个历史版本，正好够回滚（对应 S6）。
+- `app_status().lastError` 的语义：`active.json` 指向某个 build、但该目录缺少 `index.html` 时为非空 —— 这是 AppBootError「回到上一版本」的唯一触发条件。
