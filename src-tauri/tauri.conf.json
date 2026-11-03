@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "喵洛阁",
+  "version": "0.1.0",
+  "identifier": "top.kemeow.blog",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "pnpm generate && pnpm exec unrun scripts/app/gen-content-bundle.ts --out src-tauri/seed",
+    "frontendDist": "stub"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "喵洛阁",
+        "url": "app://localhost/",
+        "width": 1200,
+        "height": 820,
+        "minWidth": 528,
+        "minHeight": 600,
+        "resizable": true,
+        "center": true,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://blog.kemeow.top https://tg-api.518339.xyz https://hot-api.liiiu.cn https://ecoku.518339.xyz https://meting.081531.xyz https://netease.518339.xyz; img-src 'self' asset: http://asset.localhost https: data: blob:; media-src 'self' asset: http://asset.localhost https: data: blob:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline'; object-src 'none'; frame-src 'self' https:; base-uri 'self'; form-action 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "appimage",
+      "dmg"
+    ],
+    "resources": [
+      "seed/manifest.json",
+      "seed/content.tar.gz"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "News",
+    "shortDescription": "喵洛阁博客客户端",
+    "longDescription": "离线优先的喵洛阁博客客户端：内容编译期内嵌，断网可读；站点发布新文章后可提示更新内容包。",
+    "copyright": "Copyright © 2026 喵洛阁"
+  }
+}
