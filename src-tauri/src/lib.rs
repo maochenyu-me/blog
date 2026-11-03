@@ -1,3 +1,4 @@
+mod content_update;
 mod protocol;
 mod webroot;
 
