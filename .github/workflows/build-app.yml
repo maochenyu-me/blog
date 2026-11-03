@@ -201,7 +201,7 @@ jobs:
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
             "platform-tools" \
-            "platforms;android-37" \
+            "platforms;android-35" \
             "ndk;29.0.13846066"
           echo "NDK_HOME=$ANDROID_HOME/ndk/29.0.13846066" >> "$GITHUB_ENV"
 
@@ -247,7 +247,7 @@ jobs:
   ios:
     name: ios (unsigned ipa)
     needs: check
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 90
     steps:
       - name: Checkout
