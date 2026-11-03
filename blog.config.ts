@@ -32,6 +32,27 @@ const basicConfig = {
 // @keep-sorted
 const blogConfig = {
 	...basicConfig,
+	/**
+	 * 桌面 / 移动端 app（Tauri v2）配置
+	 *
+	 * 只有在 `window.__TAURI__` 存在的 WebView 里才会被读取；浏览器访问站点时整段逻辑都不参与，
+	 * app-only UI 也不渲染。内容包由部署链路生成到 `<站点>/app-dist/`
+	 * （生成脚本见 scripts/app/gen-content-bundle.ts，部署步骤见 CI 章节）。
+	 */
+	app: {
+		/** 总开关；false 时 app 前端逻辑与全部 app-only UI 都不渲染 */
+		enable: true,
+		/** 内容包来源站点，末尾不要带 `/`；与 manifestPath 拼成 manifestUrl 交给 Rust */
+		contentBase: 'https://blog.kemeow.top',
+		/** 内容清单路径，相对于 contentBase */
+		manifestPath: '/app-dist/manifest.json',
+		/** 启动后是否自动检查一次更新 */
+		checkOnLaunch: true,
+		/** 启动后延迟多少毫秒再检查，避免抢首屏带宽 */
+		checkDelayMs: 4000,
+		/** 检出更新后是否静默下载；false 时等用户点「更新内容」 */
+		autoDownload: false,
+	},
 
 	article: {
 		categories: {
