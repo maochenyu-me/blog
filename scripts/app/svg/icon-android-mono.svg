@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+	<!-- Android 13+ 主题图标「单色层」：单色剪影 + 镂空眼窝与发际线。
+	     Android 只取这一层的 alpha 再按系统主题上色，所以这里用不透明的 #16130F 即可。 -->
+	<defs>
+		<mask id="cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+			<rect width="1024" height="1024" fill="#fff"/>
+			<rect x="192" y="352" width="640" height="16" fill="#000"/>
+			<rect x="252" y="512" width="160" height="172" fill="#000"/>
+			<rect x="612" y="512" width="160" height="172" fill="#000"/>
+		</mask>
+	</defs>
+	<g mask="url(#cutout)" shape-rendering="crispEdges">
+		<rect x="192" y="192" width="640" height="640" fill="#16130F"/>
+	</g>
+</svg>

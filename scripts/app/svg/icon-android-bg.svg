@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+	<!-- Android 自适应图标「背景层」：满幅日落渐变，四边不留白 -->
+	<defs>
+		<linearGradient id="bgSunset" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" stop-color="#FFC772"/>
+			<stop offset="0.55" stop-color="#F2893C"/>
+			<stop offset="1" stop-color="#B93A1C"/>
+		</linearGradient>
+	</defs>
+	<rect width="1024" height="1024" fill="url(#bgSunset)"/>
+</svg>

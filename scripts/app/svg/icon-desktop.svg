@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+	<!-- 桌面主图标：圆角方形 + 四边约 10% 透明留白。
+	     macOS 不会给 .icns 自动加圆角，Windows 任务栏直接显示原图，所以圆角必须烘焙进图里。 -->
+	<defs>
+		<linearGradient id="sunset" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" stop-color="#FFC772"/>
+			<stop offset="0.55" stop-color="#F2893C"/>
+			<stop offset="1" stop-color="#B93A1C"/>
+		</linearGradient>
+		<clipPath id="squircle">
+			<rect x="102" y="102" width="820" height="820" rx="189"/>
+		</clipPath>
+	</defs>
+
+	<rect x="102" y="102" width="820" height="820" rx="189" fill="url(#sunset)"/>
+
+	<g clip-path="url(#squircle)" shape-rendering="crispEdges">
+		<!-- 肩与红领 -->
+		<rect x="176" y="704" width="672" height="218" fill="#16130F"/>
+		<rect x="288" y="704" width="448" height="80" fill="#E23A2E"/>
+		<!-- 头（墨黑脸） -->
+		<rect x="256" y="288" width="512" height="416" fill="#16130F"/>
+		<!-- 发盖：银白 + 右侧阴影 -->
+		<rect x="256" y="288" width="512" height="128" fill="#ECE8E1"/>
+		<rect x="672" y="288" width="96" height="128" fill="#C2BCB2"/>
+		<!-- 双眼 -->
+		<rect x="304" y="496" width="128" height="112" fill="#E23A2E"/>
+		<rect x="592" y="496" width="128" height="112" fill="#E23A2E"/>
+	</g>
+</svg>
