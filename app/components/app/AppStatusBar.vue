@@ -64,6 +64,21 @@ const message = computed(() => {
 		: `已加载内嵌内容 ${status.value.embeddedBuild}`
 })
 
+/** 手动检查期间自持的局部锁：桥的 checkContent 无重入锁，防止连点重复 invoke */
+const checking = ref(false)
+
+async function onManualCheck() {
+	if (checking.value)
+		return
+	checking.value = true
+	try {
+		await checkContent(true)
+	}
+	finally {
+		checking.value = false
+	}
+}
+
 const action = computed(() => {
 	if (installing.value)
 		return null
@@ -74,8 +89,8 @@ const action = computed(() => {
 		}
 	}
 	return {
-		label: '检查更新',
-		run: () => { void checkContent(true) },
+		label: checking.value ? '正在检查…' : '检查更新',
+		run: () => { void onManualCheck() },
 	}
 })
 
@@ -105,6 +120,7 @@ function formatBytes(bytes: number) {
 			v-if="action"
 			type="button"
 			class="button primary"
+			:disabled="checking"
 			@click="action.run()"
 		>
 			{{ action.label }}
@@ -113,6 +129,7 @@ function formatBytes(bytes: number) {
 			v-if="hasUpdate && !installing && !dismissed"
 			type="button"
 			class="button"
+			:disabled="checking"
 			@click="dismissed = true"
 		>
 			以后再说
@@ -246,6 +263,12 @@ function formatBytes(bytes: number) {
 	&:focus-visible {
 		outline: 2px solid var(--c-primary);
 		outline-offset: 2px;
+	}
+
+	&:disabled {
+		opacity: 0.6;
+		cursor: default;
+		pointer-events: none;
 	}
 
 	&.primary {
