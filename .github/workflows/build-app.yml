@@ -182,8 +182,12 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # setup-android@v3 会尝试安装已弃用的 tools 包并直接失败（首跑实锤：
+      # Failed to find package 'tools' → exit 1）。ubuntu runner 自带 ANDROID_HOME
+      # 与 cmdline-tools，下面的 Install 步骤自给自足，这里允许它失败。
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        continue-on-error: true
 
       # 非交互环境下缺 ANDROID_HOME / NDK_HOME，tauri android build 会直接 bail，
       # 所以两个变量都显式写进 GITHUB_ENV。
@@ -208,6 +212,17 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+
+      # 占位 seed（与 check job 相同）：tauri-build 在 codegen 阶段就要解析
+      # bundle.resources，缺文件直接 exit(1)——首跑实锤（ios job 挂在
+      # seed/manifest.json doesn't exist）。移动端 build 的 beforeBuildCommand
+      # 跑在这个阶段之后，占位会被真实 seed 覆盖。
+      - name: Create placeholder seed resources
+        shell: bash
+        run: |
+          mkdir -p src-tauri/seed
+          printf '{}' > src-tauri/seed/manifest.json
+          tar -czf src-tauri/seed/content.tar.gz -C src-tauri/stub index.html
 
       # gen/android 里烘焙着移动端图标（tauri icon 的产物，已随仓库提交）。
       # 重跑 init 会把图标覆盖回 Tauri 默认图标，所以只在 gen/ 缺失时才 init。
@@ -256,6 +271,14 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+
+      # 占位 seed：与 android job 相同原因（codegen 阶段先于 beforeBuildCommand）。
+      - name: Create placeholder seed resources
+        shell: bash
+        run: |
+          mkdir -p src-tauri/seed
+          printf '{}' > src-tauri/seed/manifest.json
+          tar -czf src-tauri/seed/content.tar.gz -C src-tauri/stub index.html
 
       # 同 Android：gen/apple 里烘焙着 iOS 图标，已提交时不要重跑 init
       - name: Init iOS project
