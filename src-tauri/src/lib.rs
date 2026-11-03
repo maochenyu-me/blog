@@ -91,6 +91,12 @@ fn content_rollback(app: tauri::AppHandle) -> serde_json::Value {
     }
 }
 
+// 移动端必需：mobile_entry_point 是**属性宏**（官方模板写法
+// `#[cfg_attr(mobile, tauri::mobile_entry_point)]`），挂在入口函数上生成 JNI
+// 符号；`mobile` 是 tauri-build 注入的 cfg alias。桌面端由 main.rs 直接调
+// run()，不需要该宏。不能写成独立语句 `tauri::mobile_entry_point!(run);`
+// —— 它不是普通过程宏（CI 第 5 轮实锤：expected macro, found attribute macro）。
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -125,7 +131,4 @@ pub fn run() {
 }
 
 // 移动端必需：生成 JNI 入口符号（Android 的 libmeowlo_app.so 校验运行时符号，
-// 缺它会在 Gradle 的 rustBuild* 任务报 "does not include required runtime
-// symbols"——CI 第 4 轮实锤）。桌面端由 main.rs 直接调 run()，不需要该宏。
-#[cfg(target_os = "android")]
-tauri::mobile_entry_point!(run);
+
