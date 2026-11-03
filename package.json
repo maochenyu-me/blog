@@ -83,6 +83,7 @@
     "@iconify-json/simple-icons": "catalog:ui",
     "@iconify-json/tabler": "catalog:ui",
     "@nuxt/hints": "catalog:quality",
+    "@tauri-apps/cli": "catalog:framework",
     "@zinkawaii/eslint-config-css": "catalog:quality",
     "cspell": "catalog:quality",
     "eslint": "catalog:quality",

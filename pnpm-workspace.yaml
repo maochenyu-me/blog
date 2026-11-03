@@ -29,6 +29,7 @@ catalogs:
     vfile: ^6.0.3
     zod: ^4.5.4
   framework:
+    '@tauri-apps/cli': 2.12.4
     '@zinkawaii/tsconfig': ^0.1.0
     ci-info: ^4.4.0
     nuxt: ^4.5.2
