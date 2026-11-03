@@ -130,5 +130,3 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-// 移动端必需：生成 JNI 入口符号（Android 的 libmeowlo_app.so 校验运行时符号，
-
