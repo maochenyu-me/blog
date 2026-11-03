@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use tauri::Manager;
 
 pub const ACTIVE_FILE: &str = "active.json";
 
@@ -74,6 +75,66 @@ pub fn candidate_paths(rel: &str) -> Vec<String> {
         format!("{rel}/index.html"),
         format!("{rel}.html"),
     ]
+}
+
+/// 解析当前应当服务的磁盘目录。返回 `None` 表示还没有任何可用内容包。
+///
+/// 正常运行时这里总应命中：首启由 `content_update::ensure_seed` 把内置种子
+/// （`bundle.resources` 里的 `seed/`）解包成 `<appData>/web/<build>/` 并写入 active.json。
+pub fn current_web_root<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<PathBuf> {
+    let state = read_active(app);
+    if !is_valid_build(&state.active) {
+        return None;
+    }
+    let base = web_base(app).ok()?;
+    let dir = base.join(&state.active);
+    if dir.join("index.html").is_file() {
+        Some(dir)
+    } else {
+        None
+    }
+}
+
+pub fn web_base<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("无法定位应用数据目录: {e}"))?;
+    let base = dir.join("web");
+    std::fs::create_dir_all(&base).map_err(|e| format!("无法创建 web 目录: {e}"))?;
+    Ok(base)
+}
+
+pub fn read_active<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> ActiveState {
+    let Ok(base) = web_base(app) else {
+        return ActiveState::default();
+    };
+    let file = base.join(ACTIVE_FILE);
+    let Ok(raw) = std::fs::read_to_string(file) else {
+        return ActiveState::default();
+    };
+    serde_json::from_str(&raw).unwrap_or_default()
+}
+
+pub fn active_web_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<PathBuf> {
+    let state = read_active(app);
+    if !is_valid_build(&state.active) {
+        return None;
+    }
+    let base = web_base(app).ok()?;
+    Some(base.join(state.active))
+}
+
+/// active.json 指向的 build 是否真的能用来服务页面。
+/// 只有「存在 build 且目录里有 index.html」才算可用。
+pub fn active_build_is_usable<R: tauri::Runtime>(app: &tauri::AppHandle<R>, build: &str) -> bool {
+    if !is_valid_build(build) {
+        return false;
+    }
+    let Ok(base) = web_base(app) else {
+        return false;
+    };
+    base.join(build).join("index.html").is_file()
 }
 
 #[cfg(test)]
