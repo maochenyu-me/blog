@@ -3,7 +3,7 @@
 - 日期：2026-11-03
 - 工程：`E:\github_maochenyu_me\blog\blog`（Nuxt 4.5.2 + Nuxt Content 3 + 纯静态 SSG）
 - 参考实例：`https://2x.nz/` 的 AcoFork App（已实测确认为 Tauri v2，产物含 `assets/tauri.conf.json` schema v2 + `lib/*/libacofork_shell.so`）
-- 状态：**待用户评审**（本文件通过评审前不写任何实现代码）
+- 状态：**已评审通过**（2026-11-03）。第 14 节的两处待确认项已由用户确认，见该节。
 
 ---
 
@@ -450,7 +450,9 @@ pnpm exec unrun scripts/app/gen-content-bundle.ts
 
 ---
 
-## 14. 待用户评审确认的两处
+## 14. 已确认的决策（2026-11-03）
 
-1. **`app-dist` 放线上站点**（`https://blog.kemeow.top/app-dist/`）会被公开访问到；内容是本站静态产物本身，不含隐私，但会多占约 3–4 MB 存储与一次下载带宽。是否接受？若不接受，改为对象存储。
-2. **`identifier` 定为 `top.kemeow.blog`**，产品名「喵洛阁」。一旦发布不宜更改，请在评审时最终确认。
+1. **内容包放线上站点**：`https://blog.kemeow.top/app-dist/` 公开可访问，内容是本站静态产物本身、不含隐私；接受多占约 3–4 MB 存储与下载带宽。**不使用对象存储**（保持零新增基础设施、同源无 CORS）。
+2. **应用标识确定**：`identifier = top.kemeow.blog`，`productName = 喵洛阁`。一旦发布不宜更改，后续一律以此为准。
+3. **移动端热更新要做**（用户明确不接受"移动端 v1 降级"）。因此 Android 与 iOS 走与桌面**完全相同**的 web 根机制；Android 由用户提供真机验收（S10），iOS 因无设备仅验 CI 构建产出（S11）。
+4. **图标选定体素头方案（B）**；镰月（A）与场景（C）作为备选视觉素材保留在设计源目录。
