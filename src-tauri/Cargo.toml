@@ -22,7 +22,7 @@ sha2 = "0.10"
 tar = "0.4"
 flate2 = "1"
 mime_guess = "2"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "json"] }
 
 # 单实例仅桌面端支持；放在 target 下可避免移动端编译失败
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
