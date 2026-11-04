@@ -74,7 +74,40 @@ let unmounted = false
 /** 骨架屏与真实卡片同高，挂载完成（或失败交给 Ecoku 自己的错误态）后撤掉 */
 const loading = ref(true)
 
+/**
+ * 离线状态。`navigator` 只在客户端存在，所以初值固定为「在线」，
+ * 挂载后再按真实网络状态纠正：SSR / 预渲染产物里不含离线说明。
+ */
+const offline = ref(false)
+
+/** 离线时挂起的加载，恢复在线（或组件卸载）后放行 */
+let onlineWaiters: Array<() => void> = []
+
+function waitUntilOnline() {
+	return new Promise<void>((resolve) => {
+		onlineWaiters.push(resolve)
+	})
+}
+
+function releaseOnlineWaiters() {
+	const waiters = onlineWaiters
+	onlineWaiters = []
+	for (const resolve of waiters)
+		resolve()
+}
+
+/** offline：就地说明原因；online：撤掉说明并放行挂起的加载 */
+function syncOffline() {
+	offline.value = !navigator.onLine
+	if (!offline.value)
+		releaseOnlineWaiters()
+}
+
 onMounted(async () => {
+	window.addEventListener('online', syncOffline)
+	window.addEventListener('offline', syncOffline)
+	syncOffline()
+
 	if (provider.value === 'twikoo') {
 		window.twikoo?.init?.({
 			envId: appConfig.twikoo?.envId,
@@ -88,6 +121,10 @@ onMounted(async () => {
 		loading.value = false
 		return
 	}
+
+	// 离线时挂起：不实例化 Ecoku（否则它会渲染自己的错误态），恢复在线后继续走原逻辑
+	if (offline.value)
+		await waitUntilOnline()
 
 	// 按需加载 SDK：只有启用 Ecoku 的文章页会下载这段客户端代码
 	const { default: EcokuClient } = await import('ecoku')
@@ -136,6 +173,10 @@ watch([pageKey, () => props.pageTitle], ([key, title]) => {
 
 onBeforeUnmount(() => {
 	unmounted = true
+	window.removeEventListener('online', syncOffline)
+	window.removeEventListener('offline', syncOffline)
+	// 放行挂起的加载，避免卸载后还留着一个永不 resolve 的 Promise
+	releaseOnlineWaiters()
 	ecoku?.destroy()
 	ecoku = null
 })
@@ -151,7 +192,7 @@ function logPageKeyError(error: unknown) {
 	id="comments"
 	ref="comment"
 	class="z-comment"
-	:aria-busy="provider === 'ecoku' && loading"
+	:aria-busy="provider === 'ecoku' && loading && !offline"
 >
 	<h3 class="text-creative">
 		评论区
@@ -196,8 +237,14 @@ function logPageKeyError(error: unknown) {
 	</Tooltip>
 
 	<template v-if="provider === 'ecoku'">
+		<!-- 离线就地说明（设计稿 D5）：只说明原因与下一步，不弹全局横幅；恢复在线后自动撤掉 -->
+		<div v-if="offline" class="comment-offline" role="status">
+			<Icon class="offline-icon" name="tabler:wifi-off" aria-hidden="true" />
+			<span>当前没有网络连接，评论需要联网才能加载。恢复网络后会自动重新加载。</span>
+		</div>
+
 		<!-- 骨架与真实评论区叠在一格里：骨架按真实卡片尺寸占位，加载完直接切换不位移 -->
-		<div class="ecoku-body">
+		<div class="ecoku-body" :class="{ 'is-offline': offline }">
 			<div
 				v-if="loading"
 				class="ecoku-skeleton"
@@ -277,6 +324,32 @@ function logPageKeyError(error: unknown) {
 	white-space: nowrap;
 }
 
+/* 离线就地说明：讲清原因与下一步，视觉与骨架同源（边框 + 卡片底色 + 一级阴影） */
+.comment-offline {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.6rem;
+	padding: 0.7rem 0.9rem;
+	border: 1px solid var(--c-border);
+	border-radius: 0.5em;
+	box-shadow: var(--box-shadow-1);
+	background: var(--ld-bg-card);
+	line-height: 1.7;
+	color: var(--c-text-2);
+
+	> .offline-icon {
+		flex: none;
+		margin-top: 0.25em;
+		font-size: 1.15rem;
+		color: var(--c-text-3);
+	}
+
+	@media (max-width: 528px) {
+		padding: 0.6rem 0.75rem;
+		font-size: 0.9375rem;
+	}
+}
+
 /* 骨架与真实评论区共用一个格子，交叉淡入 */
 .ecoku-body {
 	display: grid;
@@ -285,6 +358,11 @@ function logPageKeyError(error: unknown) {
 .ecoku-body > * {
 	grid-area: 1 / 1;
 	min-width: 0;
+}
+
+/* 离线时整块让位给上方说明。用类而不是 v-show：空 style 属性会污染在线 SSR 产物 */
+.ecoku-body.is-offline {
+	display: none;
 }
 
 /* 加载骨架：按真实发布卡片的实测尺寸占位（composer 191.7px：字段 32 + 输入 98 + 底行 58） */
