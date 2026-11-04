@@ -230,6 +230,7 @@ export default defineNuxtConfig({
 		'@nuxtjs/color-mode',
 		'@nuxtjs/seo',
 		'@pinia/nuxt',
+		'@vite-pwa/nuxt',
 		'@vueuse/nuxt',
 		'nuxt-llms',
 		'unplugin-yaml/nuxt',
@@ -343,6 +344,27 @@ ${packageJson.homepage}
 
 	ogImage: {
 		enabled: false,
+	},
+
+	pwa: {
+		registerType: 'autoUpdate',
+		manifest: {
+			name: blogConfig.title,
+			short_name: blogConfig.title,
+			description: blogConfig.description,
+			lang: blogConfig.language,
+			id: '/',
+			start_url: '/',
+			scope: '/',
+			display: 'standalone',
+			theme_color: '#1A5EFF',
+			background_color: '#FFFFFF',
+			// spike 阶段先不写 icons：等 T1 生成图标产物后再补
+		},
+		workbox: {
+			globPatterns: ['**/*.{js,css,html,json,xml,txt,svg,ico,woff,woff2}'],
+			globIgnores: ['**/img/**', '**/music/**', '_ipx/**'],
+		},
 	},
 
 	robots: {
