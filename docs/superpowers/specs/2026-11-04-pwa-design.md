@@ -3,7 +3,7 @@
 - 日期：2026-11-04
 - 工程：`E:\github_maochenyu_me\blog\blog`（Nuxt 4.5.2 + Nuxt Content 3 + 纯静态 SSG）
 - 技术选型：`@vite-pwa/nuxt`（用户指定）
-- 状态：**已通过用户评审**（2026-11-04），可进入实施
+- 状态：**已实施（2026-11-04）**。实施过程中发生**一处设计变更**：T4 的 SW 策略由 `generateSW` + `navigateFallback` 改为 `injectManifest` + 自定义 `app/sw.ts`（原因见 §10.2），其余按本方案落地。实测结论与已知限制见 §10。
 
 ---
 
@@ -46,21 +46,23 @@
 
 ## 3. 成功标准（可验收）
 
-| # | 标准 | 验证方式 |
-| --- | --- | --- |
-| S1 | `pnpm generate` 成功，`.output/public` 下存在 `manifest.webmanifest`、`sw.js`、`workbox-*.js` 与全套图标 | 构建后列目录 |
-| S2 | 产物 HTML 的 `<head>` 含 `<link rel="manifest">`、`theme-color`、apple 专属 meta | 构建产物 grep |
-| S3 | 本地静态服务打开站点，DevTools → Application：manifest 无报错、SW 状态 activated、已控制页面、预缓存条目数与清单一致 | Chrome DevTools 实测 |
-| S4 | Lighthouse 的 PWA/安装性检查通过（可安装） | Lighthouse 报告 |
-| S5 | 断网后刷新首页、任一文章页、归档页、关于页，页面完整渲染（含样式与自托管字体） | DevTools Offline 实测 |
-| S6 | 断网后访问未缓存过的图片，不出现布局塌陷或白屏（最多是缺图） | DevTools Offline 实测 |
-| S7 | 断网后评论区就地显示「需要联网」的说明；说说/热搜若有上次缓存则正常展示 | DevTools Offline 实测 |
-| S8 | 在线首访后再访问，请求由 SW 提供（Network 面板标 `(ServiceWorker)`），console 无 SW 相关报错 | DevTools 实测 |
-| S9 | 改一处可见文案 → 重新构建 → 本地服务刷新两次后看到新文案（自动更新生效） | 实测 |
-| S10 | 模拟 iPhone（非 standalone）时 iOS 引导出现一次；关闭后刷新不再出现；`standalone` 下不出现 | 浏览器 UA 模拟实测 |
-| S11 | 改动文件 `pnpm exec eslint` 零报错；`pnpm test` 全绿 | 命令行 |
-| S12 | 桌面 Chrome 实测：地址栏出现安装图标 → 可安装 → 装后独立窗口打开 | 浏览器实测 |
-| S13 | 在线状态下评论、说说、热搜、音乐、搜索、朋友圈、亮暗主题全部与改造前一致 | 浏览器逐项实测 |
+| # | 标准 | 验证方式 | 验收结果（2026-11-04，T9 全量验收） |
+| --- | --- | --- | --- |
+| S1 | `pnpm generate` 成功，`.output/public` 下存在 `manifest.webmanifest`、`sw.js`、`workbox-*.js` 与全套图标 | 构建后列目录 | **PASS（口径有调整）**：`mode injectManifest`，预缓存 371 条；`sw.js` 46,347 B；**不再产出独立的 `workbox-*.js`**（运行时已内联进 `sw.js`），其余产物齐全 |
+| S2 | 产物 HTML 的 `<head>` 含 `<link rel="manifest">`、`theme-color`、apple 专属 meta | 构建产物 grep | **PASS**（另见 §10.4 第 10 条：实测 `theme-color` 是页面底色 `#FFFFFF`/`#121212`，非主色） |
+| S3 | 本地静态服务打开站点，DevTools → Application：manifest 无报错、SW 状态 activated、已控制页面、预缓存条目数与清单一致 | Chrome DevTools 实测 | **PASS**：`activated`、首访即受控（`clientsClaim`）、预缓存条目 371 = 清单 371，剥离 `__WB_REVISION__` 后 URL 级 `missing=[] extra=[]` |
+| S4 | Lighthouse 的 PWA/安装性检查通过（可安装） | Lighthouse 报告 | **PASS（改用等效判定）**：`Page.getAppManifest.errors = []` + `Page.getInstallabilityErrors = []` + 逐项硬要求；**Lighthouse 未跑**（仓库未装，`npx --no-install` 拒绝下载） |
+| S5 | 断网后刷新首页、任一文章页、归档页、关于页，页面完整渲染（含样式与自托管字体） | DevTools Offline 实测 | **PASS**（最强口径：origin 进程已死 + CDP offline + 第三方域名全屏蔽）；4 页正文非空、未捕获异常 0、自托管字体全部命中 |
+| S6 | 断网后访问未缓存过的图片，不出现布局塌陷或白屏（最多是缺图） | DevTools Offline 实测 | **PASS**：图片可缺，但布局盒与 `scrollHeight` 在线/离线完全一致（4801 = 4801） |
+| S7 | 断网后评论区就地显示「需要联网」的说明；说说/热搜若有上次缓存则正常展示 | DevTools Offline 实测 | **PASS（评论部分）／受限**：评论就地说明有实测证据；「说说/热搜有缓存」这一分支**无法成立**，见 §10.4 第 1、11 条 |
+| S8 | 在线首访后再访问，请求由 SW 提供（Network 面板标 `(ServiceWorker)`），console 无 SW 相关报错 | DevTools 实测 | **PASS**：158 条响应中 107 条 `fromServiceWorker=true`（含文档），SW 相关报错 `[]` |
+| S9 | 改一处可见文案 → 重新构建 → 本地服务刷新两次后看到新文案（自动更新生效） | 实测 | **PASS**：逐秒采样坐实因果链（旧 SW 先给旧内容 → 新 SW 接管 → `autoUpdate` 自动 reload，< 4s） |
+| S10 | 模拟 iPhone（非 standalone）时 iOS 引导出现一次；关闭后刷新不再出现；`standalone` 下不出现 | 浏览器 UA 模拟实测 | **PASS**：`standalone` 分支改用 Chrome `--app` 真独立窗口验证（`Emulation.setEmulatedMedia` 对 `display-mode` 无效，见 §10.4 第 4 条） |
+| S11 | 改动文件 `pnpm exec eslint` 零报错；`pnpm test` 全绿 | 命令行 | **PASS**：改动文件 eslint 0 报错；`pnpm test` 195/195 |
+| S12 | 桌面 Chrome 实测：地址栏出现安装图标 → 可安装 → 装后独立窗口打开 | 浏览器实测 | **受限**：可安装性 PASS，但「装后独立窗口」未端到端实测（headless 无安装入口）；已用 `--app` 窗口作为形态替代 |
+| S13 | 在线状态下评论、说说、热搜、音乐、搜索、朋友圈、亮暗主题全部与改造前一致 | 浏览器逐项实测 | **PASS（8/8 在线可用）**；`/memos` 数据加载受限（tg-api CORS，见 §10.4 第 1 条），仅能证明页面壳与交互一致 |
+
+**失败清单：无 FAIL。** 逐条原始断言值、截图与复现脚本见审计目录 `pwa-audit/`（`.pwa-t9-report.md` 与 `.pwa-t9-shots/`，本地忽略、不入库）。
 
 ---
 
@@ -137,6 +139,8 @@ Chromium 的安装性硬要求（缺一不可）：`name` 或 `short_name`、**1
 | 音频 | `/music/**`（mp3/flac/m4a/ogg） | CacheFirst + Range 支持 | 上限 30 条 / 30 天 |
 | 站外样式与字体 | `s4.zstatic.net`、`fonts.bytedance.com` | StaleWhileRevalidate | 上限 30 条 / 30 天 |
 | 第三方 API | ecoku / tg-api / hot-api / meting / netease | NetworkOnly | — |
+
+> **实施后回填（2026-11-04）**：本节的预缓存与四组运行时策略**已全部落地，但配置位置变了**。T4 重做（§10.2）后 `pwa.workbox` 整段不存在，只剩 `pwa.injectManifest` 的 `globPatterns` / `globIgnores`；四组运行时缓存、导航路由与 `_b` 参数忽略都写进了 `app/sw.ts`。下表是设计意图，**实际代码以 `app/sw.ts` 为准**。
 
 要点：
 
@@ -229,7 +233,7 @@ Chromium 的安装性硬要求（缺一不可）：`name` 或 `short_name`、**1
 
 | # | 风险 | 影响 | 缓解 |
 | --- | --- | --- | --- |
-| R1 | **Vite 8 与模块的版本落差**：`@vite-pwa/nuxt@1.1.1` 依赖 `vite-plugin-pwa ^1.2.0`，而 1.2.0 的 peer 只声明支持到 Vite 7（2.0.0 才加 `^8`）。本项目 Vite 为 **8.2.2** | 可能构建失败或产物异常 | **动手第一步做兼容性 spike**：装依赖→构建→检查产物。失败则用 pnpm `overrides` 提升到 `vite-plugin-pwa@^2.0.0` 再验证；仍失败则回来换路线（如手写 SW） |
+| ~~R1~~ **R1（预判错误，实测更正）** | ~~Vite 8 与模块的版本落差：1.2.0 的 peer 只声明支持到 Vite 7。~~ **该判断实测不存在**：`@vite-pwa/nuxt@1.1.1` 依赖的 `^1.2.0` 实际解析到 **`vite-plugin-pwa@1.3.0`**，其 `peerDependencies.vite` 已含 **`\|\| ^8.0.0`**，本项目 Vite 是 `8.2.2`。 | 无（原判断担心的构建失败未发生） | **无需任何 `pnpm.overrides`**：T0 兼容性 spike 直接通过，`pnpm generate` 一次成功；`package.json` / `pnpm-workspace.yaml` 中确认**没有** overrides 段。后续升级 `@vite-pwa/nuxt` 时重新核对 peer 范围即可 |
 | R2 | issue #212（open）：Nuxt 4 下构建报 `[BABEL] sw.js: Cannot find module '@babel/parser'` | 构建中断 | 显式补 `@babel/parser` devDep；或改 `injectManifest` 自写 SW 绕开 workbox 打包路径 |
 | R3 | issue #204：Nuxt 4 下模块去 `app/public` 找图标源，而本项目 `public/` 在根目录 | 图标生成失败 | T1 已改为一次性生成+提交，不依赖自动探测 |
 | R4 | 预缓存体积随文章与图片增长 | 首访下载变慢 | 预缓存排除图片/音频（T7）；只缓存页面壳与文本类资源 |
@@ -259,14 +263,19 @@ Chromium 的安装性硬要求（缺一不可）：`name` 或 `short_name`、**1
 
 ## 9. 评审结论与补充决策（2026-11-04 已确认）
 
-方案整体**通过评审**，进入实施。评审时提出的 4 个问题已拍板：
+方案整体**通过评审**，进入实施。评审时提出的 4 个问题已拍板（实施后回填：**Q1–Q4 已全部按决议实施**，下方「对方案的影响」列已按落地实际情况改写）：
 
-| # | 问题 | 决议 | 对方案的影响 |
+| # | 问题 | 决议 | 对方案的影响（实施后回填） |
 | --- | --- | --- | --- |
-| Q1 | 离线兜底页 | **新做一个 `/offline` 页** | 新增路由 `app/pages/offline.vue`；需加入 `robots.disallow` 与 sitemap 排除，并设为 Workbox 的 `navigateFallback` |
-| Q2 | 启动闪屏 / maskable 填充底色 | **浅色页面底色** | `manifest.background_color` 取浅色模式页面底色；maskable 图标外圈填充同色 |
-| Q3 | 音频缓存策略 | **先配好，暂不生效** | `/music/**` 的 CacheFirst + Range 策略照写；当前目录为空，等放入音频后自动生效 |
-| Q4 | 安装说明文案 | **加一段** | 在关于页补「如何把本站装到桌面」的分平台说明（纯文案，不加 UI） |
+| Q1 | 离线兜底页 | **已按此实施**：新做一个 `/offline` 页 | 新增路由 `app/pages/offline.vue`；已加入 `robotsNotIndex` 与 sitemap 排除。**变更**：T4 重做后 `/offline` 不再由 Workbox 的 `navigateFallback` 触达，改由 `app/sw.ts` 导航路由上的 `PrecacheFallbackPlugin({ fallbackURL: '/offline' })` 触达（原因见 §10.2） |
+| Q2 | 启动闪屏 / maskable 填充底色 | **已按此实施**：浅色页面底色 | `manifest.background_color` 取 `#FFFFFF`；maskable 图标外圈填充同色 |
+| Q3 | 音频缓存策略 | **已按此实施**：先配好，暂不生效 | `/music/**` 的 CacheFirst + `RangeRequestsPlugin` 已写进 `app/sw.ts`；当前目录只有 `.gitkeep`，策略要等放入音频后才会被真实用到（见 §10.4 第 9 条） |
+| Q4 | 安装说明文案 | **已按此实施**：加一段 | 关于页已补分平台安装说明（纯文案，未加 UI） |
+
+补充两点实施期结论：
+
+- **T3 评审指出的 robots 落点**：`robotsNotIndex` 实际定义在 `blog.config.ts` 的 `article` 段（而非 `nuxt.config.ts` 的 `robots.disallow`），由 `nuxt.config.ts` 的 `robots.disallow: blogConfig.article.robotsNotIndex` 引用。两处效果等价，且写进 `blog.config.ts` 更 DRY（站点配置集中一处），保持现状。
+- **Q1 的触达方式变更**：见 §10.2；`/offline` 仍是唯一兜底页，但它现在是「网络真失败时的回退目标」，不再拦截在线导航。
 
 ### 实施前的前置门槛
 
@@ -275,3 +284,79 @@ Chromium 的安装性硬要求（缺一不可）：`name` 或 `short_name`、**1
 - 通过 → 按 §8 任务拆分进入正式实施。
 - 不通过 → 用 pnpm `overrides` 把 `vite-plugin-pwa` 提升到 `^2.0.0` 重试。
 - 仍不通过 → **停止**，向用户汇报并讨论替代路线（手写 SW 或降级方案），不擅自继续。
+
+> **实施后回填（2026-11-04）**：门槛**已通过**，且 R1 的立论前提本身不成立（`^1.2.0` 实际解析到 `vite-plugin-pwa@1.3.0`，peer 已含 `|| ^8.0.0`，见 §7 的 R1 更正）。**overrides 从未被添加**，也不需要。
+
+---
+
+## 10. 实施记录（2026-11-04 回填）
+
+### 10.1 实施状态
+
+本方案已实施完毕，代码在 `feat/pwa` 分支（评审基线 HEAD `05a09dd`）。除 §10.2 记录的**一处设计变更**外，模块接入、manifest、head 注入、图标、iOS 引导、离线降级说明、平台 headers 与安装文案均按本方案落地。逐条验收结果见 §3 表格的「验收结果」列，原始证据在审计目录 `pwa-audit/`（本地忽略、不入库）。
+
+### 10.2 设计变更：T4 的 SW 策略由 `generateSW` 改为 `injectManifest`
+
+> 编号说明：本节的 **T4 指实施阶段的任务编号**（证据见审计目录 `pwa-audit/.pwa-t4-report.md` / `.pwa-t4b-report.md`），与 §8 概览表的编号**相差 1**（§8 的 T4 是「iOS 一次性引导组件」，实施时作为 T5 执行）。下文引用 T3/T5 等同理以实施编号为准。
+
+#### 触发缺陷（用户实测确认）
+
+`pwa.workbox.navigateFallback: '/offline'` 生成的是：
+
+```js
+registerRoute(new NavigationRoute(createHandlerBoundToURL('/offline')))
+```
+
+它**只读预缓存、没有任何网络回退**，且注册在**所有运行时路由之前**（旧产物字节偏移：NavigationRoute **18555** < blog-image **18694** < blog-audio **18844** < blog-vendor-assets **19075**）。预缓存清单里的 URL 键是清理过的干净路径（`about`、`2026/example`，由 `@vite-pwa/nuxt` 的 `manifestTransforms` 去掉 `.html`/`index.html`），而 `NavigationRoute` 吞掉所有 `mode === 'navigate'` 的请求并直接回 `createHandlerBoundToURL('/offline')`。后果是**在线**状态下，任何「未预缓存形态」的导航都被替换成离线页：
+
+| 访问 URL | 旧实现实际渲染 |
+| --- | --- |
+| `/about` | ✅ 正常 |
+| `/about/` | ❌ 离线页 |
+| `/about?x=1` | ❌ 离线页 |
+| `/nope-does-not-exist` | ❌ 离线页 |
+| `/2026/example` | ✅ 正常 |
+| `/2026/example/` | ❌ 离线页 |
+
+（6 条 URL 由用户实测确认。）
+
+#### 新方案
+
+`app/sw.ts` 自定义 SW（`strategies: 'injectManifest'`，`srcDir: '.'`、`filename: 'sw.ts'`）：
+
+1. `precacheAndRoute(self.__WB_MANIFEST, { ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^_b$/] })` —— **注册在最前**：已预缓存页面直接由预缓存响应，不进导航路由；在线首屏更快，断网照常打开。
+2. 导航路由 `NetworkFirst({ cacheName: 'blog-page', networkTimeoutSeconds: 4, plugins: [ExpirationPlugin, PrecacheFallbackPlugin({ fallbackURL: '/offline' })] })` —— 在线一律走网络，拿到什么就是什么（平台自己决定尾斜杠重定向 / 404，4xx/5xx 不缓存）；**只有网络真失败**时才回退预缓存的 `/offline`。
+3. `cleanupOutdatedCaches()` + `self.skipWaiting()` + `clientsClaim()` —— `injectManifest` 下模块不再自动注入这两件事，而 `registerType: 'autoUpdate'` 的自动刷新依赖新 SW 立刻 activate。
+4. 四组运行时缓存（图片 / 音频 / 站外样式字体 / 三方 API）改由 SW 代码注册。匹配从「无锚点子串正则（匹配绝对 URL）」改成 `sameOrigin + url.pathname` 锚定开头，站外两组用 `url.origin` 精确比对 —— 旧写法会把第三方 `…/img/x.png` 吞进本站 `blog-image` 缓存。
+
+#### 顺带修掉的第二个缺陷：`_b` 参数
+
+Nuxt 取页面 payload 时请求的是 `<route>/_payload.json?_b=<buildId>`；`workbox-precaching` 默认只忽略 `/^utm_/` 与 `/^fbclid$/`，这条 URL 既命中不了任何预缓存键、也不命中任何运行时路由 ⇒ 断网后站内跳转只有页面壳、正文数据全空。补上 `/^_b$/` 后按干净 URL 命中预缓存，实测正文非空（`bodyTextLen=7592`）。
+
+#### 依赖代价
+
+新增 6 个 workbox 运行时包：`workbox-core` / `workbox-precaching` / `workbox-routing` / `workbox-strategies` / `workbox-expiration` / `workbox-range-requests`（均 `^7.4.1`，按仓库 catalogs 约定归入 `framework` 组）。旧实现走的是传递依赖，新实现显式声明。
+
+#### 与分析/任务书的关系
+
+T4 原授权范围是「把四组 `runtimeCaching` 配齐 + `navigateFallback` 指向 `/offline`」；上述在线回归是重做时才暴露的，重做经评审批准。T4 的说明性原报告保留在审计目录（`pwa-audit/.pwa-t4-report.md`），重做报告见同目录 `.pwa-t4b-report.md`。
+
+### 10.3 实测结论（S1–S13 验收 + 体积口径）
+
+- **验收结果：无 FAIL。** S1–S13 全部有实测证据（逐条见 §3 的「验收结果」列）。**S12 受限**（可安装性 PASS，装后独立窗口未端到端实测）；**S4 未跑 Lighthouse**，改用 `Page.getAppManifest.errors = []` + `Page.getInstallabilityErrors = []` + 逐项硬要求替代。
+- **预缓存体积口径（不要误读）**：磁盘未压缩合计 **8.98 MiB**（9,417,807 B / 371 条，Vite 自报 `9215.78 KiB` 与之一致）；首访实测传输 **10.26 MiB 是未压缩口径** —— 本地静态服务器没开压缩，**这不是用户下载量**；另起带 gzip 的同款服务器实测 **4.32 MiB（≈42%）**；真实 Cloudflare Pages / EdgeOne 对 html/js/css/json 用 **brotli**（通常比 gzip 再好 5–10%），因此真实首访预缓存下载量约 **4 MiB**，而非 9–10 MiB。
+- **回归**：`pnpm test` **195/195**；改动文件 `pnpm exec eslint` **0 报错**。
+
+### 10.4 已知限制（如实列出，均非本次 PWA 改造引入的回归，除非另有说明）
+
+1. **tg-api 的 CORS 白名单不含 `localhost:3000`**：`tg-api.518339.xyz` 只放行 `https://blog.kemeow.top`（站点自身域名，见 `blog.config.ts` 的 `url`）；带 `Origin: http://localhost:3000` 请求时**没有** `Access-Control-Allow-Origin` 响应头。因此「说说」在本地在线也取不到数据，`localStorage` 缓存永远写不进去 ⇒ S7 的「说说若有上次缓存则正常展示」与 S13 的「说说与改造前一致」在本地只能证明页面壳/交互一致。**改造前同样如此，非 PWA 回归；线上域名不受影响**；如需本地闭环，把 `http://localhost:3000` 加进 tg-api 白名单。
+2. **「只杀静态服务器 ≠ 断外网」**：只杀 3000 端口时第三方 API 仍可达，会让「无缓存也能离线显示」被判成**假 PASS**（实测踩到）。**后续任何离线验收都必须同时屏蔽第三方域名**（如 CDP `Network.setBlockedURLs`）。
+3. **workbox 预缓存 key 带 `?__WB_REVISION__`**：做「清单 ↔ Cache Storage」URL 级比对时必须剥离该参数，否则会把全部条目误判成「缺失」。
+4. **`Emulation.setEmulatedMedia` 对 `display-mode` 无效**：页内 `matchMedia('(display-mode: standalone)')` 仍为 `false`；验证 standalone 分支要用 Chrome `--app=<url>` 真独立窗口（那里才为 `true`）。
+5. **comment 组件的 `await import('ecoku')` 失败仍会产生 unhandled rejection**：现有守卫只覆盖「已卸载」路径，挂载中 chunk 拉取失败（dev / 无 SW 场景可达）仍可能产生未处理拒绝，骨架也可能一直转（本机复现过 Vite 依赖预打包 504 导致骨架常转，重启 dev 自愈）。**先于本次改动存在，非本次回归**。
+6. **`navigator.onLine` 在「有 LAN 无 WAF / captive portal」时不可靠**：会返回 `true`，此时 Ecoku 仍走自己的失败态（保留原行为，未改）。
+7. **iOS 引导的 `useAvoidTarget` 属超规格附加项**：提示条贴底会压住右下角悬浮面板按钮，故注册了仓库既有机制让按钮自动上移。不在 T5 任务书内，评审已判定无风险。
+8. **站外域名在 `app/sw.ts` 里硬编码**：SW 是独立构建产物，无法 `import` `blog.config.ts`，`VENDOR_ORIGINS` / `API_ORIGINS` 只能写常量 ⇒ 换域名时两处要同步改，存在漂移风险。
+9. **`/music/**` 音频缓存无法用真实音频验证**：`public/music/` 下只有 `.gitkeep`，只验证到配置正确注入 `sw.js`（含 `RangeRequestsPlugin`），未做真实 mp3 的 206 分段实测。
+10. **manifest `theme_color` 与 head `theme-color` 不一致**：manifest 是 `#1A5EFF`（T3 决策），产物 head 的两条 `theme-color` 实测是页面底色（light `#FFFFFF` / dark `#121212`），head 脚本会在用户改主色时覆盖为用户所选色。未装应用时安卓工具栏用页面底色，装后启动瞬间用 manifest 的 `#1A5EFF`，观感上有一次颜色跳变。是否为有意为之待确认（不影响 S2 判定）。
+11. **T2 的技术前提对 `/hot` 不成立**：§4.2 的 T2 写「这些功能本身已有 localStorage 缓存与刷新策略」，实测 `useMemos.ts` 确有 `memos:first-page:v1:<id>` 的 24h localStorage 缓存（只是被 CORS 挡在写不进去），而 `/hot` **完全没有**持久缓存 ⇒ 离线时显示「0 条 / 微博的热榜没取到…重试」。属体面降级（有文案 + 重试按钮），符合 D5；若要离线可读需给 hot 补缓存策略。

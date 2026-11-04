@@ -142,6 +142,72 @@ pnpm-workspace.yaml   # pnpm catalogs
 - **prerender 报错排障**：`generate` 报 `Exiting due to prerender errors` 时，搜完整日志的 `[404]` 和 `Linked from`，修正指向已删除文章的链接。
 - Node 版本须满足 `package.json` engines（`engineStrict: true`）。
 
+## PWA（可安装 + 离线）
+
+面向维护者：站点已具备 PWA 能力（可安装 + 离线阅读）。改动前先看完本节，尤其是「缓存分层在哪里改」与「测试的四个坑」。
+
+### 组成
+
+| 部件 | 位置 | 作用 |
+| --- | --- | --- |
+| `@vite-pwa/nuxt` | `nuxt.config.ts` 的 `pwa` 块 | 生成 manifest、向 SW 注入预缓存清单、客户端注册与自动更新 |
+| 自定义 Service Worker | `app/sw.ts` | 预缓存 + 四组运行时缓存 + 导航路由，**手写** |
+| manifest | `nuxt.config.ts` 的 `pwa.manifest` | 名称/图标/`display: standalone`/`theme_color` |
+| iOS 一次性引导 | `app/components/blog/PwaIosHint.vue`（挂在 `app/layouts/default.vue`） | iOS 没有原生安装提示，补一条可关闭的提示条 |
+| 离线兜底页 | `app/pages/offline.vue`（路由 `/offline`） | 网络失败且未预缓存时的落地页，已从收录中排除 |
+
+- 策略是 `strategies: 'injectManifest'`，**不是** `generateSW`。`srcDir: '.'` 不是笔误：injectManifest 下 `swSrc` 由 Vite root（Nuxt 4 = `app/`）拼出，写成 `'app'` 会去找 `app/app/sw.ts` 而构建失败。
+- **`pwa.workbox` 整段不存在**：injectManifest 策略只读 `pwa.injectManifest`，把 glob 配置留在 `workbox` 里不会生效。
+- `skipWaiting()` / `clientsClaim()` 必须由 `app/sw.ts` 自己调用 —— injectManifest 下模块不会像 generateSW 那样注入，而 `registerType: 'autoUpdate'` 的自动刷新依赖新 SW 立刻 activate。
+
+### 缓存分层在哪里改
+
+| 层 | 改哪里 | 现状 |
+| --- | --- | --- |
+| 预缓存清单 | `nuxt.config.ts` → `pwa.injectManifest.globPatterns` / `globIgnores` | `**/*.{js,css,html,json,xml,txt,svg,ico,wasm,woff,woff2}`，排除 `**/img/**`、`**/music/**`、`_ipx/**`。`wasm` 是离线搜索（sqlite3）的依赖，**不能删** |
+| 预缓存忽略参数 | `app/sw.ts` 的 `precacheAndRoute(..., { ignoreURLParametersMatching })` | `utm_` / `fbclid` / **`_b`**。`_b` 是 Nuxt 取 payload 时追加的 buildId，删了它离线站内跳转只剩页面壳、没有正文 |
+| 导航（文档请求） | `app/sw.ts` 的 `NetworkFirst` + `PrecacheFallbackPlugin` | 4s 超时；在线一律走网络（平台自己决定尾斜杠/404），只有网络真失败才回退 `/offline` |
+| 图片 / 音频 / 站外样式字体 / 三方 API | `app/sw.ts` 的四组 `registerRoute` | CacheFirst 200 条/30d；CacheFirst + `RangeRequestsPlugin` 30 条/30d；StaleWhileRevalidate 30 条/30d；NetworkOnly |
+| 清旧预缓存 | `app/sw.ts` 的 `cleanupOutdatedCaches()` | 回收旧版本 SW 留下的 `-precache-` 缓存 |
+
+匹配规则用 `sameOrigin + url.pathname` 锚定开头（站外两组用 `url.origin` 精确比对）。**不要**退回旧的无锚点子串正则：它匹配的是绝对 URL，第三方 `…/img/x.png` 会被吞进本站 `blog-image` 缓存白占配额。
+
+### 重新生成图标
+
+- 源图 `public/img/avatar/avatar.webp`（256×256，放大到 512 会略软，已知且接受）。
+- 产物：`public/img/pwa/{icon-192,icon-512,maskable-512}.png` 与 `public/apple-touch-icon.png`；改完在 `nuxt.config.ts` 的 `pwa.manifest.icons` 里对号。
+- **当前图标是一次性产物**：计划里写的 `@vite-pwa/assets-generator` 命令与实际接口不符（v2.0.0 没有 `--out`，预置名也没有 `minimal-2023`；照计划书的命令跑会静默 exit 1）。重新生成需**自行用 `sharp` 重做**：maskable 版本把源图缩到 **80% 居中**、四周填充 **`#FFFFFF`**（与 `manifest.background_color` 一致）。
+
+### `sw.js` 与 `manifest.webmanifest` 必须不被 CDN 缓存
+
+两个都加 `Cache-Control: no-cache`，**两处都要改**；换 SW 文件名时同步改两处：
+
+- `public/_headers`（Cloudflare Pages）
+- `edgeone.json` 的 `headers`（EdgeOne Makers）
+
+漏改任何一处，用户会长时间停在旧 SW 上（或更新检查被 CDN 拖死）。
+
+### 测试这套 PWA 的四个坑
+
+1. **必须用 `http://localhost:<port>`**：`navigator.serviceWorker` 只在安全上下文存在，用局域网 IP 打开会静默跳过注册（不报错，看起来像「没接上」）；且 Ecoku 评论接口的 Origin 白名单只放行 `localhost:3000`，换端口/换 host 即 403，会误判成离线降级失效。
+2. **离线要真断源 + 屏蔽第三方域名**：「只杀静态服务器 ≠ 断外网」，第三方 API 仍可达会把「无缓存也能离线显示」判成**假 PASS**。仅用 CDP `Network.emulateNetworkConditions{offline:true}` 也不行 —— 它拦不住 SW 内部 fetch，会产生假阴性；需叠加 `Network.setBlockedURLs`（或真断网卡）。
+3. **workbox 预缓存 key 带 `?__WB_REVISION__`**：做「清单 ↔ Cache Storage」URL 级比对时必须剥离该参数，否则会把全部条目误判成缺失。
+4. **`Emulation.setEmulatedMedia` 对 `display-mode` 无效**：验证 `standalone` 分支要用 Chrome `--app=<url>` 真独立窗口（那里 `matchMedia('(display-mode: standalone)')` 才为 `true`）。
+
+### 改动 SW 后的验证方式
+
+`pnpm generate` 后检查构建日志与产物：
+
+- 日志出现 `mode injectManifest`，以及 `precache  N entries`；
+- 清单条数 = Cache Storage 里 `workbox-precache-v2-*` 的条目数（当前 **371**）；
+- 产物里**没有** ESM 语法（SW 以 classic 注册，有 `import`/`export`/`import.meta` 会直接解析失败）：
+
+  ```bash
+  grep -cE "^\s*(import|export)\b|import\.meta" .output/public/sw.js   # 期望 0
+  ```
+
+- `.output/public` 下不再有独立的 `workbox-*.js`（运行时已内联进 `sw.js`，单文件约 46 KB）。
+
 ## 工具链约定
 
 - **pnpm catalogs**：`pnpm-workspace.yaml` 将依赖按 `ui` / `content` / `framework` / `util` / `quality` 分组，`package.json` 用 `catalog:xxx` 引用。升级依赖走 `pnpm bump` 或 `nip`。
