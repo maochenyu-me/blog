@@ -40,6 +40,12 @@ catalogs:
     unplugin-yaml: ^4.2.1
     vue: ^3.5.42
     vue-router: ^5.3.1
+    workbox-core: ^7.4.1
+    workbox-expiration: ^7.4.1
+    workbox-precaching: ^7.4.1
+    workbox-range-requests: ^7.4.1
+    workbox-routing: ^7.4.1
+    workbox-strategies: ^7.4.1
   quality:
     '@antfu/eslint-config': ^9.5.1
     '@nuxt/hints': ^1.1.4

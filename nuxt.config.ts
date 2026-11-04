@@ -363,6 +363,13 @@ ${packageJson.homepage}
 
 	pwa: {
 		registerType: 'autoUpdate',
+		// generateSW 的 navigateFallback 只读预缓存、没有网络回退，且注册在所有运行时路由之前，
+		// 会让在线访问 `/about/`、`/about?x=1` 这类未预缓存形态直接落到离线页（T4 重做的原因）。
+		// 改用自定义 SW：导航走 NetworkFirst，网络失败才回退预缓存的 `/offline`（见 app/sw.ts）
+		strategies: 'injectManifest',
+		// Nuxt 4 下 Vite 的 root 是 `app/`（= srcDir），所以 `srcDir: '.'` 指的是 `app/sw.ts`
+		srcDir: '.',
+		filename: 'sw.ts',
 		manifest: {
 			name: blogConfig.title,
 			short_name: blogConfig.title,
@@ -381,48 +388,11 @@ ${packageJson.homepage}
 				{ src: '/img/pwa/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
 			],
 		},
-		workbox: {
+		// glob 相关配置要从 workbox 迁到 injectManifest：injectManifest 策略下模块只读这一段的配置
+		injectManifest: {
 			// wasm 是客户端内容搜索（sqlite3）的依赖，缺了它断网后搜索会坏
 			globPatterns: ['**/*.{js,css,html,json,xml,txt,svg,ico,wasm,woff,woff2}'],
 			globIgnores: ['**/img/**', '**/music/**', '_ipx/**'],
-			// T3 实测：本机与 CI 两种构建的预缓存 URL 键都是 `offline`（不是 `offline.html`），
-			// 写成 `offline.html` 会抛 non-precached-url
-			navigateFallback: '/offline',
-			runtimeCaching: [
-				{
-					// 图片：构建期优化产物 /_ipx/** 与静态图 /img/**
-					urlPattern: /\/_ipx\/|\/img\//,
-					handler: 'CacheFirst',
-					options: {
-						cacheName: 'blog-image',
-						expiration: { maxEntries: 200, maxAgeSeconds: 2592000 },
-					},
-				},
-				{
-					// 音频：rangeRequests 会注入 RangeRequestsPlugin，缺了它拖动进度条取不到分段
-					urlPattern: /\/music\//,
-					handler: 'CacheFirst',
-					options: {
-						cacheName: 'blog-audio',
-						expiration: { maxEntries: 30, maxAgeSeconds: 2592000 },
-						rangeRequests: true,
-					},
-				},
-				{
-					// 站外样式与字体多为跨域不透明响应（只能存不能读），故限条数防缓存配额被占满
-					urlPattern: /^https:\/\/(?:s4\.zstatic\.net|fonts\.bytedance\.com)\//,
-					handler: 'StaleWhileRevalidate',
-					options: {
-						cacheName: 'blog-vendor-assets',
-						expiration: { maxEntries: 30, maxAgeSeconds: 2592000 },
-					},
-				},
-				{
-					// 第三方 API 自身已有 localStorage 缓存与刷新策略，SW 不再插一层写出第二套过期逻辑
-					urlPattern: /^https:\/\/(?:ecoku\.518339\.xyz|tg-api\.518339\.xyz|hot-api\.liiiu\.cn|meting\.081531\.xyz|netease\.518339\.xyz)\//,
-					handler: 'NetworkOnly',
-				},
-			],
 		},
 	},
 

@@ -72,6 +72,12 @@
     "vue": "catalog:framework",
     "vue-router": "catalog:framework",
     "vue-tippy": "catalog:ui",
+    "workbox-core": "catalog:framework",
+    "workbox-expiration": "catalog:framework",
+    "workbox-precaching": "catalog:framework",
+    "workbox-range-requests": "catalog:framework",
+    "workbox-routing": "catalog:framework",
+    "workbox-strategies": "catalog:framework",
     "zod": "catalog:content"
   },
   "devDependencies": {
