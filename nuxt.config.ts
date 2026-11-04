@@ -22,6 +22,7 @@ function pluginPath(path: string) {
 /**
  * 首屏前应用本地保存的主题色（键名与 app/components/blog/ThemeToggle.vue 一致）。
  * 必须内联在 head 里执行，否则侧栏取色按钮挂载前会先闪一次默认蓝。
+ * 同时把 `<meta name="theme-color">` 同步为用户所选色，让已安装应用的安卓状态栏/工具栏跟上主色（T4）。
  */
 const themeColorScript = `try {
 	const hex = localStorage.getItem('blog-primary-color')
@@ -46,6 +47,13 @@ const themeColorScript = `try {
 		style.setProperty('--c-primary-s', Math.round(s * 100) + '%')
 		style.setProperty('--c-primary-l', Math.round(l * 100) + '%')
 		style.setProperty('--c-primary-base', hex)
+		// theme-color meta 由 unhead 排在脚本之后，先就地试一次，再等文档解析完兜底同步
+		const syncThemeColor = () => {
+			for (const meta of document.querySelectorAll('meta[name="theme-color"]'))
+				meta.setAttribute('content', hex)
+		}
+		syncThemeColor()
+		document.addEventListener('DOMContentLoaded', syncThemeColor)
 	}
 } catch {}`
 
@@ -54,11 +62,18 @@ export default defineNuxtConfig({
 	app: {
 		head: {
 			meta: [
+				// iOS 「添加到主屏幕」：全屏运行与主屏名称
+				{ name: 'apple-mobile-web-app-capable', content: 'yes' },
+				{ name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+				{ name: 'apple-mobile-web-app-title', content: blogConfig.title },
 				{ name: 'author', content: [blogConfig.author.name, blogConfig.author.email].filter(Boolean).join(', ') },
 				{ name: 'color-scheme', content: 'light dark' },
 				// 此处为元数据的生成器标识，不建议修改
 				{ 'name': 'generator', 'content': `${pascalCase(packageJson.name)} ${packageJson.version}`, 'data-github-repo': packageJson.homepage },
 				{ name: 'mobile-web-app-capable', content: 'yes' },
+				// 亮/暗模式页面底色（color.css 的 --c-bg：亮 hsl(220deg 0% 100%)、暗 hsl(* 0% 7%)），供安卓工具栏取色
+				{ name: 'theme-color', content: '#FFFFFF', media: '(prefers-color-scheme: light)' },
+				{ name: 'theme-color', content: '#121212', media: '(prefers-color-scheme: dark)' },
 			],
 			link: [
 				{ rel: 'icon', href: blogConfig.favicon },
@@ -359,7 +374,12 @@ ${packageJson.homepage}
 			display: 'standalone',
 			theme_color: '#1A5EFF',
 			background_color: '#FFFFFF',
-			// spike 阶段先不写 icons：等 T1 生成图标产物后再补
+			// T1 已生成图标产物，此处显式声明（Chromium 安装性要求 192 与 512 两种尺寸）
+			icons: [
+				{ src: '/img/pwa/icon-192.png', sizes: '192x192', type: 'image/png' },
+				{ src: '/img/pwa/icon-512.png', sizes: '512x512', type: 'image/png' },
+				{ src: '/img/pwa/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+			],
 		},
 		workbox: {
 			globPatterns: ['**/*.{js,css,html,json,xml,txt,svg,ico,woff,woff2}'],
