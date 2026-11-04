@@ -50,7 +50,12 @@ registerRoute(
 	new NetworkFirst({
 		cacheName: 'blog-page',
 		networkTimeoutSeconds: 4,
-		plugins: [new PrecacheFallbackPlugin({ fallbackURL: '/offline' })],
+		// 这条缓存只承接「规范 URL 之外」的导航（尾斜杠、带查询串等），量很小，但必须设上限：
+		// cleanupOutdatedCaches() 只回收 `-precache-` 前缀的缓存，运行时缓存不设上限会跨发版一直涨。
+		plugins: [
+			new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 7 * 24 * 3600 }),
+			new PrecacheFallbackPlugin({ fallbackURL: '/offline' }),
+		],
 	}),
 )
 
