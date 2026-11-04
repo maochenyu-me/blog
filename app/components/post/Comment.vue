@@ -104,6 +104,7 @@ function syncOffline() {
 }
 
 onMounted(async () => {
+	// 离线状态目前只被下方 ecoku 分支消费（S7）；将来若切到 twikoo/none，这两行监听需一并收敛进该分支
 	window.addEventListener('online', syncOffline)
 	window.addEventListener('offline', syncOffline)
 	syncOffline()
@@ -125,6 +126,10 @@ onMounted(async () => {
 	// 离线时挂起：不实例化 Ecoku（否则它会渲染自己的错误态），恢复在线后继续走原逻辑
 	if (offline.value)
 		await waitUntilOnline()
+
+	// 卸载后不再发起 import：chunk 取不到会产生 unhandled rejection（dev / 无 SW 场景可达）
+	if (unmounted)
+		return
 
 	// 按需加载 SDK：只有启用 Ecoku 的文章页会下载这段客户端代码
 	const { default: EcokuClient } = await import('ecoku')
@@ -237,14 +242,15 @@ function logPageKeyError(error: unknown) {
 	</Tooltip>
 
 	<template v-if="provider === 'ecoku'">
-		<!-- 离线就地说明（设计稿 D5）：只说明原因与下一步，不弹全局横幅；恢复在线后自动撤掉 -->
-		<div v-if="offline" class="comment-offline" role="status">
+		<!-- 离线就地说明（设计稿 D5）：只在「尚未加载完成」（loading）时让位——评论已经到手的用户断网后不该被收走；
+			说明也随之撤掉，因为那个让位理由对已加载的评论已不成立。恢复在线后本条件恒为假，说明自动消失 -->
+		<div v-if="offline && loading" class="comment-offline" role="status">
 			<Icon class="offline-icon" name="tabler:wifi-off" aria-hidden="true" />
-			<span>当前没有网络连接，评论需要联网才能加载。恢复网络后会自动重新加载。</span>
+			<span>当前没有网络连接，评论需要联网才能加载。</span>
 		</div>
 
 		<!-- 骨架与真实评论区叠在一格里：骨架按真实卡片尺寸占位，加载完直接切换不位移 -->
-		<div class="ecoku-body" :class="{ 'is-offline': offline }">
+		<div class="ecoku-body" :class="{ 'is-offline': offline && loading }">
 			<div
 				v-if="loading"
 				class="ecoku-skeleton"
@@ -360,7 +366,8 @@ function logPageKeyError(error: unknown) {
 	min-width: 0;
 }
 
-/* 离线时整块让位给上方说明。用类而不是 v-show：空 style 属性会污染在线 SSR 产物 */
+/* 尚未加载完成（loading）且离线时才整块让位给上方说明；已加载的评论断网后继续可见。
+   用类而不是 v-show：空 style 属性会污染在线 SSR 产物 */
 .ecoku-body.is-offline {
 	display: none;
 }
