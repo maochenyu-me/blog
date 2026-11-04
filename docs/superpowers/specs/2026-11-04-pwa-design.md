@@ -48,7 +48,7 @@
 
 | # | 标准 | 验证方式 | 验收结果（2026-11-04，T9 全量验收） |
 | --- | --- | --- | --- |
-| S1 | `pnpm generate` 成功，`.output/public` 下存在 `manifest.webmanifest`、`sw.js`、`workbox-*.js` 与全套图标 | 构建后列目录 | **PASS（口径有调整）**：`mode injectManifest`，预缓存 371 条；`sw.js` 46,347 B；**不再产出独立的 `workbox-*.js`**（运行时已内联进 `sw.js`），其余产物齐全 |
+| S1 | `pnpm generate` 成功，`.output/public` 下存在 `manifest.webmanifest`、`sw.js` 与全套图标（injectManifest 下**不再**有独立 `workbox-*.js`，运行时已内联进 `sw.js`） | 构建后列目录 | **PASS（口径有调整）**：`mode injectManifest`，预缓存 371 条；`sw.js` 46,347 B；不再产出独立的 `workbox-*.js`，其余产物齐全 |
 | S2 | 产物 HTML 的 `<head>` 含 `<link rel="manifest">`、`theme-color`、apple 专属 meta | 构建产物 grep | **PASS**（另见 §10.4 第 10 条：实测 `theme-color` 是页面底色 `#FFFFFF`/`#121212`，非主色） |
 | S3 | 本地静态服务打开站点，DevTools → Application：manifest 无报错、SW 状态 activated、已控制页面、预缓存条目数与清单一致 | Chrome DevTools 实测 | **PASS**：`activated`、首访即受控（`clientsClaim`）、预缓存条目 371 = 清单 371，剥离 `__WB_REVISION__` 后 URL 级 `missing=[] extra=[]` |
 | S4 | Lighthouse 的 PWA/安装性检查通过（可安装） | Lighthouse 报告 | **PASS（改用等效判定）**：`Page.getAppManifest.errors = []` + `Page.getInstallabilityErrors = []` + 逐项硬要求；**Lighthouse 未跑**（仓库未装，`npx --no-install` 拒绝下载） |
@@ -194,9 +194,11 @@ Chromium 的安装性硬要求（缺一不可）：`name` 或 `short_name`、**1
 | `apple-mobile-web-app-capable` | `yes` | iOS 全屏运行（旧机制） |
 | `apple-mobile-web-app-title` | `喵洛阁` | iOS 主屏名称 |
 | `apple-mobile-web-app-status-bar-style` | `default` | iOS 状态栏样式 |
-| `theme-color` | 主色（亮/暗各一条） | 安卓工具栏配色 |
+| `theme-color` | 页面底色（亮 `#FFFFFF` / 暗 `#121212`） | 安卓工具栏配色 |
 
 现有 `mobile-web-app-capable` 保留不删。现有 `themeColorScript` 扩写一处：用户改主色时同步更新 `theme-color` meta（T4）。
+
+> **注（实施后更正）**：`theme-color` 取**页面底色**（与浏览器工具栏融合），而 manifest 的 `theme_color` 按 T3 决策取**主色** `#1A5EFF` —— 两者用途不同。副作用是已安装应用启动瞬间用主色、随后切到底色，观感上有一次颜色跳变，属已声明的已知限制（§10.4 第 10 条）。
 
 ### 5.8 与仓库既有约定的对齐
 
@@ -344,7 +346,7 @@ T4 原授权范围是「把四组 `runtimeCaching` 配齐 + `navigateFallback` �
 ### 10.3 实测结论（S1–S13 验收 + 体积口径）
 
 - **验收结果：无 FAIL。** S1–S13 全部有实测证据（逐条见 §3 的「验收结果」列）。**S12 受限**（可安装性 PASS，装后独立窗口未端到端实测）；**S4 未跑 Lighthouse**，改用 `Page.getAppManifest.errors = []` + `Page.getInstallabilityErrors = []` + 逐项硬要求替代。
-- **预缓存体积口径（不要误读）**：磁盘未压缩合计 **8.98 MiB**（9,417,807 B / 371 条，Vite 自报 `9215.78 KiB` 与之一致）；首访实测传输 **10.26 MiB 是未压缩口径** —— 本地静态服务器没开压缩，**这不是用户下载量**；另起带 gzip 的同款服务器实测 **4.32 MiB（≈42%）**；真实 Cloudflare Pages / EdgeOne 对 html/js/css/json 用 **brotli**（通常比 gzip 再好 5–10%），因此真实首访预缓存下载量约 **4 MiB**，而非 9–10 MiB。
+- **预缓存体积口径（不要误读）**：Vite 自报磁盘未压缩合计约 **9215 KiB ≈ 9.00 MiB**（371 条）。该数字会随构建微幅波动 —— 构建期会 live 拉取 `/api/memos/latest`，HTML 与 payload 大小非确定（两次独立构建实测 9,437,479 B / 9,437,491 B，差异全在 HTML）；首访实测传输 **10.26 MiB 是未压缩口径** —— 本地静态服务器没开压缩，**这不是用户下载量**；另起带 gzip 的同款服务器实测 **4.32 MiB（≈42%）**；真实 Cloudflare Pages / EdgeOne 对 html/js/css/json 用 **brotli**（通常比 gzip 再好 5–10%），因此真实首访预缓存下载量约 **4 MiB**，而非 9–10 MiB。
 - **回归**：`pnpm test` **195/195**；改动文件 `pnpm exec eslint` **0 报错**。
 
 ### 10.4 已知限制（如实列出，均非本次 PWA 改造引入的回归，除非另有说明）
@@ -358,5 +360,7 @@ T4 原授权范围是「把四组 `runtimeCaching` 配齐 + `navigateFallback` �
 7. **iOS 引导的 `useAvoidTarget` 属超规格附加项**：提示条贴底会压住右下角悬浮面板按钮，故注册了仓库既有机制让按钮自动上移。不在 T5 任务书内，评审已判定无风险。
 8. **站外域名在 `app/sw.ts` 里硬编码**：SW 是独立构建产物，无法 `import` `blog.config.ts`，`VENDOR_ORIGINS` / `API_ORIGINS` 只能写常量 ⇒ 换域名时两处要同步改，存在漂移风险。
 9. **`/music/**` 音频缓存无法用真实音频验证**：`public/music/` 下只有 `.gitkeep`，只验证到配置正确注入 `sw.js`（含 `RangeRequestsPlugin`），未做真实 mp3 的 206 分段实测。
-10. **manifest `theme_color` 与 head `theme-color` 不一致**：manifest 是 `#1A5EFF`（T3 决策），产物 head 的两条 `theme-color` 实测是页面底色（light `#FFFFFF` / dark `#121212`），head 脚本会在用户改主色时覆盖为用户所选色。未装应用时安卓工具栏用页面底色，装后启动瞬间用 manifest 的 `#1A5EFF`，观感上有一次颜色跳变。是否为有意为之待确认（不影响 S2 判定）。
+10. **manifest `theme_color` 与 head `theme-color` 不一致**：manifest 是 `#1A5EFF`（T3 决策），产物 head 的两条 `theme-color` 实测是页面底色（light `#FFFFFF` / dark `#121212`），head 脚本会在用户改主色时覆盖为用户所选色。未装应用时安卓工具栏用页面底色，装后启动瞬间用 manifest 的 `#1A5EFF`，观感上有一次颜色跳变。**这是有意为之**：manifest 的 `theme_color` 是应用身份色，head 的 `theme-color` 用于与页面底色融合；若要消除跳变，把 manifest 的 `theme_color` 也改成页面底色即可（不影响 S2 判定）。
 11. **T2 的技术前提对 `/hot` 不成立**：§4.2 的 T2 写「这些功能本身已有 localStorage 缓存与刷新策略」，实测 `useMemos.ts` 确有 `memos:first-page:v1:<id>` 的 24h localStorage 缓存（只是被 CORS 挡在写不进去），而 `/hot` **完全没有**持久缓存 ⇒ 离线时显示「0 条 / 微博的热榜没取到…重试」。属体面降级（有文案 + 重试按钮），符合 D5；若要离线可读需给 hot 补缓存策略。
+12. **离线兜底会把地址栏归一为 `/offline`，因此拿不回原始地址**：`PrecacheFallbackPlugin` 只是把 `/offline` 的文档交给浏览器，地址栏仍是读者原本要去的 URL；Nuxt 随后（约 1.2s）用 `history.replaceState` 归一到 `/offline`。后果是「重新加载」重载的是本页自身，无法回到读者原本要去的页面。**已做的补救**：离线页文案不再承诺「重新加载这个页面」，并额外给一个「返回首页」（首页在预缓存里，断网时也能打开）。彻底恢复原地址需要额外的 URL 暂存机制，未做。
+13. **manifest 图标不在预缓存里**：图标位于 `/img/pwa/**`，被 `globIgnores` 的 `**/img/**` 排除 ⇒ 离线时浏览器控制台会报 `Error while trying to use the following icon from the Manifest: /img/pwa/icon-192.png`。不影响安装（安装必然在线）与已装应用图标，无用户可见影响；若要消噪可把这三张图单独加回预缓存（约 165 KB）。

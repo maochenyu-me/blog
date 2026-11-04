@@ -5,7 +5,13 @@ useSeoMeta({
 	robots: 'noindex, nofollow',
 })
 
-/** 断网时访问未预缓存的网址会落到这里；恢复网络后由读者自己决定何时重新加载 */
+/**
+ * 断网时访问未预缓存的网址会落到这里。
+ *
+ * 注意：本页是被 Service Worker 当作离线兜底渲染的，Nuxt 随后会把地址栏归一到 `/offline`，
+ * 所以「重新加载」重载的是这一页本身，拿不回读者原本要去的地址。因此额外给一个「返回首页」——
+ * 首页在预缓存里，断网时也照样能打开，是真正回得去的出口。
+ */
 function reload() {
 	location.reload()
 }
@@ -22,15 +28,22 @@ function reload() {
 			这个页面还没有缓存到本地，所以现在打不开它。
 		</p>
 		<p class="offline-desc">
-			等网络恢复后，点下面的按钮重新加载这个页面。
+			网络恢复后可以回到首页继续阅读；也可以点「重新加载」再试一次。
 		</p>
 
-		<ZButton
-			primary
-			icon="tabler:refresh"
-			text="重新加载"
-			@click="reload"
-		/>
+		<div class="offline-actions">
+			<ZButton
+				primary
+				icon="tabler:home"
+				text="返回首页"
+				to="/"
+			/>
+			<ZButton
+				icon="tabler:refresh"
+				text="重新加载"
+				@click="reload"
+			/>
+		</div>
 	</div>
 </div>
 </template>
@@ -71,5 +84,13 @@ function reload() {
 
 .offline-desc {
 	color: var(--c-text-2);
+}
+
+.offline-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.5rem;
+	margin-top: 0.5rem;
 }
 </style>
