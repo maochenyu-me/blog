@@ -398,8 +398,8 @@ ${packageJson.homepage}
 		defaultLocale: blogConfig.language,
 	},
 
-	/** 中转页只是站内跳板，不该出现在站点地图里被搜索引擎当作入口页收录 */
+	/** 中转页只是站内跳板、离线兜底页只在断网时出现，不该出现在站点地图里被搜索引擎当作入口页收录 */
 	sitemap: {
-		exclude: ['/go'],
+		exclude: ['/go', '/offline'],
 	},
 })
