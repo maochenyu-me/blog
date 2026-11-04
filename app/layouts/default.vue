@@ -17,6 +17,8 @@ const { slots } = provideLayoutSlots()
 	</BlogAside>
 </div>
 <BlogFooter />
+<!-- iOS 无任何原生安装提示，补一条一次性引导；其它端不渲染任何节点 -->
+<BlogPwaIosHint />
 <!-- 音乐：唯一的 UI 是导航入口打开的弹窗，关掉不中断播放（引擎常驻在模块里） -->
 <MusicPanel />
 <BlogPanel :has-aside="!!slots?.aside" />
