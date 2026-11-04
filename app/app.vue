@@ -17,4 +17,6 @@ const contentPageKey = (route: RouteLocationNormalizedLoaded) => normalizeConten
 	<!-- pageKey 现在是稳定引用，这里不需要 v-once，路由仍由 NuxtPage 内部更新。 -->
 	<NuxtPage :page-key="contentPageKey" />
 </NuxtLayout>
+<!-- 放在根级、ClientOnly 之外，SSR/预渲染时才会把 manifest 链接写进静态 HTML -->
+<NuxtPwaManifest />
 </template>

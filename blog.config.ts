@@ -63,7 +63,7 @@ const blogConfig = {
 		/** 隐藏基于文件路由（不是自定义链接）的 URL /post 路径前缀 */
 		hidePostPrefix: true,
 		/** 禁止搜索引擎收录的路径 */
-		robotsNotIndex: ['/go', '/preview', '/previews/*'],
+		robotsNotIndex: ['/go', '/offline', '/preview', '/previews/*'],
 	},
 
 	/** 评论区使用的评论系统 */
