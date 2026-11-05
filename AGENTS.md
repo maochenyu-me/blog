@@ -199,14 +199,29 @@ pnpm-workspace.yaml   # pnpm catalogs
 `pnpm generate` 后检查构建日志与产物：
 
 - 日志出现 `mode injectManifest`，以及 `precache  N entries`；
-- 清单条数 = Cache Storage 里 `workbox-precache-v2-*` 的条目数（当前 **371**）；
+- 清单条数 = Cache Storage 里 `workbox-precache-v2-*` 的条目数（当前 **389**）；
 - 产物里**没有** ESM 语法（SW 以 classic 注册，有 `import`/`export`/`import.meta` 会直接解析失败）：
 
   ```bash
   grep -cE "^\s*(import|export)\b|import\.meta" .output/public/sw.js   # 期望 0
   ```
 
-- `.output/public` 下不再有独立的 `workbox-*.js`（运行时已内联进 `sw.js`，单文件约 46 KB）。
+- `.output/public` 下不再有独立的 `workbox-*.js`（运行时已内联进 `sw.js`，单文件约 52 KB）。
+- **占位符必须已被展开**（最容易静默失败的一条）：`grep -c "__WB_MANIFEST" .output/public/sw.js` 期望 **0**。
+
+### 缓存健康的两个自愈机制
+
+线上出现过大面积 `Failed to load resource: net::ERR_CACHE_READ_FAILURE`，表现为**非离线状态也慢**（JS 加载失败 → 动态 import 失败 → 水合不匹配 → 说说/评论反复重试）。根因是 Workbox 的 `_handleInstall` 抛错时**不回滚已写入的条目**，而 `skipWaiting()` 已让坏缓存接管页面。现在有两道防线：
+
+1. **激活后体检**（`app/sw.ts` 的 `precacheSelfCheck`）：抽样读几条真实预缓存条目的 body，读不回来就清空全部缓存 + `registration.unregister()`，下次访问重新装一份干净的。**放在 `activate` 之后而不是 `install` 里**：`install` 的多个监听器 `waitUntil` 是并行的，在 Workbox 写完前自检必然误判。
+2. **坏条目自愈**（`SelfHealingCachePlugin`）：`CacheFirst`/`NetworkFirst`/`StaleWhileRevalidate` 命中损坏条目时 `clone().arrayBuffer()` 会抛错，插件删掉该条目并返回 `null` 让策略走网络。**Workbox 自己不会删坏条目**，没有这层的话一个坏条目会永久坏下去。
+
+### 踩过的坑（都真实发生过，改 SW 前必读）
+
+1. **别在源码里第二次引用 `self.__WB_MANIFEST`**（连同注释里的完整写法也算）。injectManifest 要求该占位符在源码中**只出现一次**，多一处插件就放弃注入：产物里会原样留下未展开的占位符，**预缓存条目直接从 389 变 0，而构建不报任何错**。自检要读缓存就按 cache 名取条目，不要碰清单。
+2. **class 声明有暂时性死区**：插件类必须定义在所有 `registerRoute` **之前**，否则 SW 求值阶段直接 `ReferenceError`。
+3. **`python -m http.server` 不能用来验 PWA**：单线程，浏览器并发拉几十个资源时会 `ERR_EMPTY_RESPONSE`，页面都打不开。本地验离线要用能并发的静态服务器（临时脚本即可，别提交）。
+4. **验离线要真断源**：停掉静态服务器再导航才算数。CDP 的 `offline:true` 拦不住 SW 内部 fetch，会产生假阴性；只杀静态服务器而不屏蔽第三方域名，则会产生假阳性。
 
 ## 说说页面（数据源：tg / ech0）
 

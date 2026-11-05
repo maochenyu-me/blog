@@ -11,7 +11,7 @@ import blogConfig from '~~/blog.config'
 declare let self: ServiceWorkerGlobalScope
 
 /**
- * 预缓存清单由 `@vite-pwa/nuxt` 的 injectManifest 在构建期注入（injectionPoint 即 `self.__WB_MANIFEST`），
+ * 预缓存清单由 `@vite-pwa/nuxt` 的 injectManifest 在构建期注入（injectionPoint 即 manifest 占位符），
  * 注入源是 `nuxt.config.ts` 的 `pwa.injectManifest.globPatterns` / `globIgnores`。
  *
  * - 必须在所有运行时路由**之前**注册：已预缓存的页面（`/about`、`/2026/example`）直接由预缓存响应，
@@ -24,16 +24,109 @@ precacheAndRoute(self.__WB_MANIFEST, {
 	ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^_b$/],
 })
 
+/**
+ * 缓存健康检查：直接读预缓存里的真实条目，确认它们没坏。
+ *
+ * **不能在这里再引用那个 manifest 占位符**：injectManifest 要求它在源码中只出现一次
+ * （作为 injectionPoint，由构建期替换成清单数组）。多引用一次，插件就放弃注入，
+ * 产物里会原样留下未展开的占位符，**整份预缓存静默失效**
+ * （实测发生过：条目从 389 变成 0，而构建不报错）。所以这里只按缓存名取条目，不碰清单。
+ */
+const SW_CACHE_PREFIX = 'workbox-precache'
+
+async function precacheSelfCheck() {
+	try {
+		const cacheNames = (await self.caches.keys()).filter(name => name.startsWith(SW_CACHE_PREFIX))
+		if (!cacheNames.length)
+			return false
+
+		for (const cacheName of cacheNames) {
+			const cache = await self.caches.open(cacheName)
+			const requests = await cache.keys()
+			if (!requests.length)
+				continue
+			// 均匀抽样几条真去读 body：损坏条目会抛 ERR_CACHE_READ_FAILURE
+			const step = Math.max(1, Math.floor(requests.length / 5))
+			for (let i = 0; i < requests.length; i += step) {
+				const response = await cache.match(requests[i]!)
+				if (!response)
+					return false
+				await response.arrayBuffer()
+			}
+		}
+		return true
+	}
+	catch (error) {
+		console.warn('[sw] 预缓存健康检查异常', error)
+		return false
+	}
+}
+
+/** 清空本 SW 名下的所有缓存（预缓存 + 运行时缓存） */
+async function dropAllCaches() {
+	const names = await self.caches.keys()
+	await Promise.all(names.map(name => self.caches.delete(name)))
+}
+
 // 清掉旧版本 SW 留下的预缓存（缓存名带版本后缀），避免 Cache Storage 随每次发版无限增长
 cleanupOutdatedCaches()
 
 /**
- * `registerType: 'autoUpdate'` 时模块只负责在 SW `activated`（isUpdate）后刷新页面，
- * 「立即接管」仍需 SW 自己声明：install 完直接 activate，并马上接管尚未受控的页面。
- * （generateSW 时代这两件事由模块写进 `workbox.skipWaiting` / `clientsClaim`，injectManifest 下不会自动注入。）
+ * 立即接管：「autoUpdate」依赖新 SW 立刻 activate 并接管已打开的页面。
+ * 这件事与缓存健康检查解耦 —— 检查放到 activate 之后异步做。
  */
 self.skipWaiting()
-clientsClaim()
+
+self.addEventListener('activate', (event: ExtendableEvent) => {
+	event.waitUntil((async () => {
+		await clientsClaim()
+		// 缓存健康检查放在接管之后跑：这时预缓存已定稿，不会和 install 的写入抢时序。
+		// 坏缓存要清掉并注销自己，让下次打开重新装一份干净的。
+		if (await precacheSelfCheck())
+			return
+		console.warn('[sw] 预缓存自检失败，清空缓存并注销当前 SW，下次访问重新安装')
+		await dropAllCaches()
+		await self.registration.unregister()
+		// 把已打开的页面交给网络，避免它们继续挂在坏缓存上
+		for (const client of await self.clients.matchAll({ type: 'window' }))
+			void client.navigate(client.url).catch(() => {})
+	})())
+})
+
+/**
+ * 自愈插件：缓存条目读坏时删掉它并回退到网络。
+ *
+ * 线上事故里大量 `ERR_CACHE_READ_FAILURE` 不只是 install 半残导致 —— CacheFirst 命中一条
+ * 损坏的缓存条目时，网络层直接报错，**Workbox 不会自动删掉坏条目**，于是这个资源永远坏下去，
+ * 页面反复失败重试（这就是「没离线但说说/评论一直很慢」的直接感受）。
+ * 这里在策略之前拦截：读失败 → 删条目 → 让策略走网络，下一次重新缓存。
+ *
+ * 定义必须放在所有 `registerRoute` 之前：class 声明有暂时性死区，
+ * 在使用点之后定义会在 SW 求值阶段直接抛 ReferenceError。
+ */
+class SelfHealingCachePlugin {
+	async cachedResponseWillBeUsed({ cacheName, cachedResponse, request }: {
+		cacheName?: string
+		cachedResponse?: Response
+		request: Request
+	}) {
+		if (!cachedResponse)
+			return null
+		try {
+			// 真正读一次 body，损坏的条目会在这里抛错（ERR_CACHE_READ_FAILURE）
+			await cachedResponse.clone().arrayBuffer()
+			return cachedResponse
+		}
+		catch {
+			console.warn('[sw] 缓存条目读取失败，删除后回退网络', request.url)
+			if (cacheName) {
+				const cache = await self.caches.open(cacheName)
+				await cache.delete(request, { ignoreSearch: true })
+			}
+			return null
+		}
+	}
+}
 
 /**
  * 导航路由（本次重做的核心）。
@@ -54,6 +147,7 @@ registerRoute(
 		// 这条缓存只承接「规范 URL 之外」的导航（尾斜杠、带查询串等），量很小，但必须设上限：
 		// cleanupOutdatedCaches() 只回收 `-precache-` 前缀的缓存，运行时缓存不设上限会跨发版一直涨。
 		plugins: [
+			new SelfHealingCachePlugin(),
 			new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 7 * 24 * 3600 }),
 			new PrecacheFallbackPlugin({ fallbackURL: '/offline' }),
 		],
@@ -73,7 +167,11 @@ registerRoute(
 	({ sameOrigin, url }) => sameOrigin && /^\/(?:_ipx|img)\//.test(url.pathname),
 	new CacheFirst({
 		cacheName: 'blog-image',
-		plugins: [new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 2592000 })],
+		plugins: [
+			// 自愈插件必须排在 ExpirationPlugin 之前：先决定要不要用这条缓存
+			new SelfHealingCachePlugin(),
+			new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 2592000 }),
+		],
 	}),
 )
 
@@ -83,6 +181,7 @@ registerRoute(
 	new CacheFirst({
 		cacheName: 'blog-audio',
 		plugins: [
+			new SelfHealingCachePlugin(),
 			new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 2592000 }),
 			new RangeRequestsPlugin(),
 		],
@@ -102,7 +201,10 @@ registerRoute(
 	({ url }) => VENDOR_ORIGINS.has(url.origin),
 	new StaleWhileRevalidate({
 		cacheName: 'blog-vendor-assets',
-		plugins: [new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 2592000 })],
+		plugins: [
+			new SelfHealingCachePlugin(),
+			new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 2592000 }),
+		],
 	}),
 )
 
