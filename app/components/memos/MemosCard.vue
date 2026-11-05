@@ -56,6 +56,56 @@ async function onReply() {
 		replying.value = false
 	}
 }
+
+/**
+ * 正文图片加载失败时替换成可见占位块。
+ *
+ * 为什么必须在 JS 里做：图片源坏掉时浏览器只会在原位置留一个「破图」，而
+ * `alt` 为空的 `<img>` 会被压成 0 尺寸（`height:auto` + 无内在尺寸），
+ * 于是卡片上什么都不剩 —— 看起来像这段内容凭空消失了。
+ * CSS 的 `::before/::after` 对替换元素无效，光靠样式补不出占位，所以这里
+ * 用事件委托（`error` 不冒泡，必须用捕获阶段）把坏图就地换成一个显式的占位块。
+ */
+const contentEl = useTemplateRef<HTMLElement>('content')
+
+function replaceBrokenImage(img: HTMLImageElement) {
+	if (img.dataset.broken === '1')
+		return
+	img.dataset.broken = '1'
+
+	const placeholder = document.createElement('span')
+	placeholder.className = 'memos-image-broken'
+	placeholder.setAttribute('role', 'img')
+	placeholder.setAttribute('aria-label', '图片加载失败')
+	// 保留原图地址作为提示，方便排查（也便于以后做点击重试）
+	if (img.currentSrc || img.src)
+		placeholder.title = img.currentSrc || img.src
+	placeholder.textContent = '图片加载失败'
+	img.replaceWith(placeholder)
+}
+
+function onContentError(event: Event) {
+	const target = event.target
+	if (target instanceof HTMLImageElement)
+		replaceBrokenImage(target)
+}
+
+onMounted(() => {
+	const root = contentEl.value
+	if (!root)
+		return
+	// `error` 事件不冒泡，但可以在捕获阶段收到
+	root.addEventListener('error', onContentError, true)
+	// 已经加载完且失败的图（例如水合前就 404）不会再触发 error，这里补扫一遍
+	for (const img of root.querySelectorAll('img')) {
+		if (img.complete && img.naturalWidth === 0)
+			replaceBrokenImage(img)
+	}
+})
+
+onBeforeUnmount(() => {
+	contentEl.value?.removeEventListener('error', onContentError, true)
+})
 </script>
 
 <template>
@@ -102,7 +152,7 @@ async function onReply() {
 		</UtilLink>
 	</header>
 
-	<div v-if="message.html" class="memos-content" v-html="message.html" />
+	<div v-if="message.html" ref="content" class="memos-content" v-html="message.html" />
 
 	<MemosExtensionCard v-if="message.extension" :extension="message.extension" />
 
@@ -305,6 +355,23 @@ async function onReply() {
 		height: auto;
 		max-width: 100%;
 		border-radius: 0.4em;
+	}
+
+	/* 坏图占位块（JS 在图片 error 时就地替换出来）：虚线框 + 浅底，最小高度防止塌成一条线 */
+	:deep(.memos-image-broken) {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		/* 用 rem 而非 em：此处 font-size 被压到 0.8em，em 会跟着缩到只剩 70px 高，像条空带子 */
+		min-width: 8rem;
+		min-height: 9rem;
+		padding: 1rem;
+		border: 1px dashed var(--c-flat-card-border);
+		border-radius: 0.4em;
+		background-color: var(--c-flat-card-bg-2);
+		font-size: 0.8em;
+		color: var(--c-text-3);
+		user-select: none;
 	}
 }
 

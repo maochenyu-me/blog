@@ -114,6 +114,18 @@ async function zoom(event: MouseEvent) {
 function getRatio(width?: number, height?: number) {
 	return width && height ? `${width} / ${height}` : undefined
 }
+
+/**
+ * 附件图片加载失败时给外框打标记，由 CSS 渲染占位。
+ * 这里不替换 DOM（外层是带 aspect-ratio 的按钮，框体本来就在），
+ * 只补一个「加载失败」文案层，避免用户看到一块纯色空框却不知道发生了什么。
+ */
+function markBroken(event: Event) {
+	const img = event.target
+	if (!(img instanceof HTMLImageElement))
+		return
+	img.closest('.memos-image')?.classList.add('is-broken')
+}
 </script>
 
 <template>
@@ -139,6 +151,7 @@ function getRatio(width?: number, height?: number) {
 				:style="{ aspectRatio: images.length === 1 ? getRatio(image.width, image.height) : undefined }"
 				loading="lazy"
 				decoding="async"
+				@error="markBroken"
 			>
 		</button>
 	</div>
@@ -214,6 +227,39 @@ function getRatio(width?: number, height?: number) {
 
 	&:not(.single) > img {
 		aspect-ratio: 1;
+	}
+
+	/* 图片加载失败：破图隐掉，用伪元素补「加载失败」提示（框体本身有背景与 aspect-ratio） */
+	&.is-broken {
+		cursor: default;
+
+		> img {
+			opacity: 0;
+		}
+
+		&::after {
+			content: "图片加载失败";
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			position: absolute;
+			inset: 0;
+			padding: 0.5em;
+			border: 1px dashed var(--c-flat-card-border);
+			border-radius: inherit;
+			font-size: 0.75em;
+			text-align: center;
+			color: var(--c-text-3);
+			pointer-events: none;
+		}
+
+		&:hover {
+			box-shadow: none;
+
+			> img {
+				transform: none;
+			}
+		}
 	}
 
 	&:hover {
