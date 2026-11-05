@@ -2,7 +2,7 @@
 
 import { clientsClaim } from 'workbox-core'
 import { ExpirationPlugin } from 'workbox-expiration'
-import { cleanupOutdatedCaches, precacheAndRoute, PrecacheFallbackPlugin } from 'workbox-precaching'
+import { addPlugins, cleanupOutdatedCaches, precacheAndRoute, PrecacheFallbackPlugin } from 'workbox-precaching'
 import { RangeRequestsPlugin } from 'workbox-range-requests'
 import { registerRoute } from 'workbox-routing'
 import { CacheFirst, NetworkFirst, NetworkOnly, StaleWhileRevalidate } from 'workbox-strategies'
@@ -20,6 +20,47 @@ declare let self: ServiceWorkerGlobalScope
  *   Nuxt 取页面 payload 时请求的是 `<route>/_payload.json?_b=<buildId>`，不忽略 `_b` 的话
  *   预缓存永远命中不了 —— 离线站内跳转会出现「页面壳到了、正文数据全空」。
  */
+
+/**
+ * 单个预缓存条目 404 不能拖垮整份预缓存。
+ *
+ * Workbox 的 `PrecacheStrategy._handleInstall` 规则是：清单里**任何一个** URL 返回非 2xx，
+ * `cachePut()` 就返回 false，接着 `throw bad-precaching-response`，整个 `install` 失败 ——
+ * 用户的 PWA 装不上，也拿不到离线能力。线上真实发生过：
+ *
+ *   bad-precaching-response :: [{"url":"https://blog.kemeow.top/2026","status":404}]
+ *
+ * 成因是部署产物与 `sw.js` 不同步：某次构建存在 `/2026` 目录页，后来文章内容变了目录页没了，
+ * 但线上 `sw.js` 仍是旧的（或 CDN 缓存了旧 HTML），清单里就留下一个死链接。
+ * 这类「清单漂移」在静态托管上很难完全杜绝（增量部署、CDN 缓存、构建竞态都可能触发）。
+ *
+ * **踩过的坑**：最初写成「404 时 `cacheWillUpdate` 返回 `null`」，结果**反而更容易失败**。
+ * 因为 `StrategyHandler.cachePut()` 里 `if (!responseToCache) return false`，
+ * 而 `_handleInstall` 拿到 `wasCached === false` 就抛 `bad-precaching-response`。
+ * 也就是说返回 null 等价于「缓存失败」，正是要避免的那条路径。
+ *
+ * 正确做法：**返回一个 2xx 的空响应替身**，让 `cachePut` 认为缓存成功（返回 true），
+ * `install` 就能继续跑完。该 URL 在缓存里是一个空 body，离线打开会是空白页而非报错 ——
+ * 但这只影响那个本来就不存在的死链接，其余 389 个条目正常可用。
+ *
+ * 只对 404/410 生效；5xx 等真故障仍按原样放行，让 Workbox 判定失败（应该暴露）。
+ */
+const TOLERATE_MISSING_PRECACHE_ENTRY: { cacheWillUpdate: (ctx: { response?: Response }) => Promise<Response | undefined> } = {
+	async cacheWillUpdate({ response }) {
+		if (!response || (response.status !== 404 && response.status !== 410))
+			return response
+
+		// 用一个合法的 2xx 空响应替换掉 404，骗过 cachePut 的可缓存性判定
+		return new Response(new Blob([]), {
+			status: 200,
+			statusText: 'OK',
+			headers: { 'content-type': 'text/plain; charset=utf-8' },
+		})
+	},
+}
+
+addPlugins([TOLERATE_MISSING_PRECACHE_ENTRY])
+
 precacheAndRoute(self.__WB_MANIFEST, {
 	ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^_b$/],
 })
