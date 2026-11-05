@@ -316,8 +316,47 @@ POST {apiBase}/api/echo/query   body {page, pageSize}
 
 部署前必须完成项目个性化配置与内容修改：不得将作者信息用于自己的网站图标/名称，严禁将项目内作者文章以你的名义重新发布至公开环境（详见 README「耻辱柱」）。
 
+## 生产环境的水合告警（已知、无害、不修）
+
+生产产物（`pnpm generate` 后）控制台会有一条：
+
+```
+Hydration completed but contains mismatches.
+```
+
+**结论：不影响任何功能，无需处理。** 实测已确认时间文本正常渲染（无 `undefined`/`Invalid`）、侧栏 5 个 widget 全部出现、相对时间定时器仍在刷新（65 秒后 `23分钟前` → `24分钟前`）。
+
+**成因**（排查时别再走弯路）：
+
+1. 来源不是 `<html>` 上的 `class`。`@nuxtjs/color-mode` 确实会在 `<head>` 里同步给 `<html>` 加 `class="dark|light"`，而预渲染 HTML 只有 `lang`，但那是**另一处独立现象**，不是这条告警。
+2. 真正来源是**懒水合组件里的 `<NuxtTime>`**。堆栈里出现 `__asyncHydrate` + `registerDep` 就是标志 —— 只有 `LazyWidget*`（`app/composables/useWidgets.ts`）这条路径才会出现。
+3. `NuxtTime` 的 `dataset` **只在 `import.meta.server` 分支填充**：
+
+   ```js
+   const dataset = {}
+   if (import.meta.server) { for (const prop in props) dataset[`data-${...}`] = props[prop] }
+   ```
+
+   模板 `<time v-bind="dataset">`：服务端写出 `data-year` / `data-month` / `data-relative` 等，客户端 `dataset` 是空对象，水合时 Vue 要把这些属性删掉 → 属性不一致 → 报 mismatch。
+4. 正常组件靠 `data-prehydrate-id` 在水合前改文本可以掩盖这个差异；但在 `LazyWidget*` 的懒水合边界内，修正时机晚于 Vue 的属性对比，于是暴露出来。
+
+**定位手法**（下次要查就照这个来）：
+
+```bash
+# 1. 临时打开诊断开关：nuxt.config.ts → vite.define.__VUE_PROD_HYDRATION_MISMATCH_DETAILS__
+# 2. 重新 pnpm generate，用本地静态服务器打开生产产物，控制台会打印具体失配节点
+# 3. 对比服务端 HTML 与浏览器 DOM 里 <time> 的属性即可确认：
+curl -s http://localhost:4173/ | grep -oE '<time[^>]*>'        # 有 data-*
+# 浏览器: [...document.querySelectorAll('time')].map(t => [...t.attributes].map(a => a.name))
+# 相对时间那个只剩 ["datetime"]，属性被删光 —— 就是它
+```
+
+**为什么不修**：修它得改 `useWidgets.ts` 的渲染路径（把 `LazyWidget*` 换成非懒加载，代价是首屏多加载几个 widget），或者改被 8 个组件复用的 `app/components/util/Date.vue`（文章页、归档页、说说页、友链卡都依赖它，回归面大）。换来的只是控制台少一条警告，功能零改善，不划算。
+
+**禁止**用「预渲染时写死 `class="light"`」的方式消除——那会让暗色模式用户每次打开先闪一下白屏，比一条警告糟得多。
+
 ## 开发提示
 
 - `.vscode/settings.json`：Vue 默认 formatter 为 null（交给 ESLint 的 codeActionsOnSave），TypeScript 用官方 LSP，CSS 引用 stylelint（若保留 SCSS）。
 - 开发期已移除 `@nuxt/a11y` 自动扫描（3.8.0，性能考虑）。
-- 调试水合/过渡：`nuxt.config.ts` 中 `vite.define.__VUE_PROD_HYDRATION_MISMATCH_DETAILS__` 和 `__VUE_PROD_DEVTOOLS__` 注释掉的开关可开启诊断。
+- 调试水合/过渡：`nuxt.config.ts` 中 `vite.define.__VUE_PROD_HYDRATION_MISMATCH_DETAILS__` 和 `__VUE_PROD_DEVTOOLS__` 注释掉的开关可开启诊断（用法见上方「生产环境的水合告警」）。
