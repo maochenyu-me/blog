@@ -35,7 +35,7 @@
     "reward:summary": "node scripts/reward-apply/comment-summary.ts",
     "reward:test": "node --test \"scripts/reward-apply/*.test.ts\"",
     "fcircle:fetch": "unrun scripts/fcircle/fetch.ts",
-    "test": "node --test \"scripts/**/*.test.ts\""
+    "test": "node --test \"scripts/**/*.test.ts\" \"app/utils/**/*.test.ts\""
   },
   "dependencies": {
     "@bikariya/image-viewer": "catalog:ui",
@@ -60,6 +60,7 @@
     "embla-carousel-vue": "catalog:ui",
     "embla-carousel-wheel-gestures": "catalog:ui",
     "es-toolkit": "catalog:util",
+    "markdown-it": "catalog:content",
     "mermaid": "catalog:content",
     "minisearch": "catalog:util",
     "nuxt": "catalog:framework",

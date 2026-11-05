@@ -3,22 +3,30 @@ import type { MemosMessage } from '~/types/memos'
 
 const props = withDefaults(defineProps<{
 	message: MemosMessage
-	/** 展示消息所属频道（多频道或全局时间线时有用） */
-	showChannel?: boolean
+	/** 展示作者/频道标识（多频道或全局时间线时有用） */
+	showAuthor?: boolean
 }>(), {
-	showChannel: true,
+	showAuthor: true,
 })
 
 const appConfig = useAppConfig()
 
-const channelLabel = computed(() => {
-	if (!props.showChannel)
+/** ech0 用 @username，tg 用频道 username 或频道名 */
+const authorLabel = computed(() => {
+	if (!props.showAuthor)
 		return ''
-	const { username, title } = props.message.channel
-	return username ? `@${username}` : title
+	if (props.message.authorHandle)
+		return `@${props.message.authorHandle}`
+	return props.message.authorName ?? ''
 })
 
-const verifiedTip = '这个说说来自博客作者本人的 Telegram 频道'
+const isEch0 = computed(() => props.message.source === 'ech0')
+
+const verifiedTip = computed(() =>
+	isEch0.value ? '这个说说来自博客作者本人的 Ech0' : '这个说说来自博客作者本人的 Telegram 频道')
+
+const sourceIcon = computed(() => (isEch0.value ? 'tabler:external-link' : 'tabler:brand-telegram'))
+const sourceTip = computed(() => (isEch0.value ? '在 Ech0 中查看原帖' : '在 Telegram 中查看源消息'))
 
 /** 头像优先取说说专属配置，留空时用站点作者头像 */
 const avatar = computed(() => {
@@ -51,7 +59,7 @@ async function onReply() {
 </script>
 
 <template>
-<article class="memos-card">
+<article :id="`memo-${message.id}`" class="memos-card">
 	<header class="memos-meta">
 		<!--
 			用原生 img 而非 NuxtImg：卡片是客户端渲染的，构建期 prerender 的 HTML 里没有它，
@@ -79,30 +87,39 @@ async function onReply() {
 
 			<div class="sub">
 				<UtilDate class="date" :date="message.publishedAt" />
-				<span v-if="channelLabel" class="channel" v-text="channelLabel" />
-				<span v-if="message.revision > 1" v-tip="'这条说说在 Telegram 中被编辑过'" class="edited">已编辑</span>
+				<span v-if="authorLabel" class="channel" v-text="authorLabel" />
+				<span v-if="(message.revision ?? 1) > 1" v-tip="'这条说说在源站被编辑过'" class="edited">已编辑</span>
 			</div>
 		</div>
 
 		<UtilLink
 			v-if="message.sourceUrl"
-			v-tip="'在 Telegram 中查看源消息'"
+			v-tip="sourceTip"
 			class="source"
 			:to="message.sourceUrl"
 		>
-			<Icon name="tabler:brand-telegram" />
+			<Icon :name="sourceIcon" />
 		</UtilLink>
 	</header>
 
 	<div v-if="message.html" class="memos-content" v-html="message.html" />
 
+	<MemosExtensionCard v-if="message.extension" :extension="message.extension" />
+
 	<MemosMedia v-if="message.media.length" :media="message.media" />
 
 	<footer class="memos-footer">
-		<div v-if="message.tags.length" class="memos-tags">
-			<span v-for="tag in message.tags" :key="tag" class="tag">
-				<Icon name="tabler:hash" />
-				<span>{{ tag.slice(1) }}</span>
+		<div class="memos-footer-left">
+			<div v-if="message.tags.length" class="memos-tags">
+				<span v-for="tag in message.tags" :key="tag" class="tag">
+					<Icon name="tabler:hash" />
+					<span>{{ tag.slice(1) }}</span>
+				</span>
+			</div>
+
+			<span v-if="message.favCount" class="memos-fav" :title="`${message.favCount} 次点赞`">
+				<Icon name="tabler:heart-filled" />
+				<span>{{ message.favCount }}</span>
 			</span>
 		</div>
 
@@ -259,6 +276,36 @@ async function onReply() {
 		border-inline-start: 3px solid var(--c-border);
 		color: var(--c-text-3);
 	}
+
+	/* 表格在窄屏下会撑破卡片：由 markdown 渲染器包一层 .memos-table 做横向滚动 */
+	:deep(.memos-table) {
+		overflow-x: auto;
+		max-width: 100%;
+	}
+
+	:deep(table) {
+		border-collapse: collapse;
+		font-size: 0.9em;
+
+		th,
+		td {
+			padding: 0.35em 0.6em;
+			border: 1px solid var(--c-flat-card-border);
+			text-align: start;
+		}
+
+		th {
+			background-color: var(--c-flat-card-bg-2);
+			font-weight: 600;
+			color: var(--c-text-1);
+		}
+	}
+
+	:deep(img) {
+		height: auto;
+		max-width: 100%;
+		border-radius: 0.4em;
+	}
 }
 
 .memos-footer {
@@ -267,6 +314,29 @@ async function onReply() {
 	justify-content: space-between;
 	gap: 0.5em;
 	min-height: 1.6em;
+}
+
+.memos-footer-left {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5em;
+	min-width: 0;
+}
+
+.memos-fav {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 0.15em;
+	font-size: 0.78em;
+	color: var(--c-text-3);
+	user-select: none;
+
+	> .iconify {
+		font-size: 1em;
+		color: var(--c-error);
+	}
 }
 
 .memos-tags {

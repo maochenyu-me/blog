@@ -20,6 +20,14 @@ function pluginPath(path: string) {
 }
 
 /**
+ * 说说接口的预连接地址：按 `memos.source` 取，避免为未使用的数据源白白建连。
+ * 说说首屏数据在客户端挂载后才请求，提前建连能把 TLS 握手摊到解析 HTML 的空档里。
+ */
+const memosApiOrigin = new URL(
+	blogConfig.memos.source === 'tg' ? blogConfig.memos.tg.apiBase : blogConfig.memos.ech0.apiBase,
+).origin
+
+/**
  * 首屏前应用本地保存的主题色（键名与 app/components/blog/ThemeToggle.vue 一致）。
  * 必须内联在 head 里执行，否则侧栏取色按钮挂载前会先闪一次默认蓝。
  * 同时把 `<meta name="theme-color">` 同步为用户所选色，让已安装应用的安卓状态栏/工具栏跟上主色（T4）。
@@ -78,8 +86,8 @@ export default defineNuxtConfig({
 			link: [
 				{ rel: 'icon', href: blogConfig.favicon },
 				{ rel: 'alternate', type: 'application/atom+xml', href: '/atom.xml' },
-				// 说说接口在首屏挂载后才请求，提前建连把 TLS 握手摊到解析 HTML 的空档里
-				{ rel: 'preconnect', href: new URL(blogConfig.memos.apiBase).origin, crossorigin: 'anonymous' },
+				// 说说接口在首屏挂载后才请求，提前建连把 TLS 握手摊到解析 HTML 的空档里（按数据源取，见 memosApiOrigin）
+				{ rel: 'preconnect', href: memosApiOrigin, crossorigin: 'anonymous' },
 				// 热搜接口同样在挂载后才请求，提前建连；接口已开放 CORS，匿名预连接即可
 				{ rel: 'preconnect', href: new URL(blogConfig.hot.apiBase).origin, crossorigin: 'anonymous' },
 				// Twikoo 未配置（preload 为空）时不输出 preconnect，否则会产生空 href 的 link 标签
@@ -225,7 +233,7 @@ export default defineNuxtConfig({
 			// 开发环境把说说接口转发到 koharu-suite，避免 localhost 被其 CORS 白名单拦截
 			proxy: {
 				'/koharu-api': {
-					target: blogConfig.memos.apiBase,
+					target: blogConfig.memos.tg.apiBase,
 					changeOrigin: true,
 					rewrite: (path: string) => path.replace(/^\/koharu-api/, ''),
 				},

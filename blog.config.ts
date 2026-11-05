@@ -1,4 +1,5 @@
 import type { FeedEntry } from './app/types/feed'
+import type { MemosSource } from './app/types/memos'
 import type { MessageTip } from './app/types/message'
 import type { MetingPlaylistConfig, NeteasePlaylistConfig } from './app/types/music'
 import type { RewardConfig } from './app/types/reward'
@@ -157,12 +158,17 @@ const blogConfig = {
 		},
 	},
 
-	/** 说说页面（数据来自自部署 koharu-suite 的公开读取 API） */
+	/**
+	 * 说说页面（数据源二选一）
+	 * - `tg`：koharu-suite 的公开读取 API（Telegram 频道）
+	 * - `ech0`：自部署 Ech0（<https://github.com/lin-snow/Ech0>）的公开读取 API
+	 */
 	memos: {
-		/** koharu-suite 站点地址，末尾不要加 `/` */
-		apiBase: 'https://tg-api.518339.xyz',
-		/** 只展示这些频道的消息（suite channel UUID），留空表示展示全部公开频道 */
-		channelIds: [] as string[],
+		/**
+		 * 选用哪个数据源
+		 * `tg` 需要下方的 `memos.tg`；`ech0` 需要下方的 `memos.ech0`
+		 */
+		source: 'ech0' as MemosSource,
 		/** 每次加载的消息条数，取值范围 1~100 */
 		perPage: 20,
 		/** 首屏缓存在多久内视为新鲜（毫秒）；超时仍先用缓存出内容，再后台静默刷新 */
@@ -190,6 +196,30 @@ const blogConfig = {
 			description: '记录生活点滴，一些想法。',
 			/** 卡片最小高度，支持任意 CSS 长度 */
 			height: '16rem',
+		},
+		/** tg 数据源：koharu-suite（Telegram 频道） */
+		tg: {
+			/** koharu-suite 站点地址，末尾不要加 `/` */
+			apiBase: 'https://tg-api.518339.xyz',
+			/** 只展示这些频道的消息（suite channel UUID），留空表示展示全部公开频道 */
+			channelIds: [] as string[],
+		},
+		/** ech0 数据源：自部署 Ech0 实例 */
+		ech0: {
+			/** 实例地址，末尾不要加 `/` */
+			apiBase: 'https://m.081531.xyz',
+			/** 卡片右上角「查看原帖」的跳转站点，留空时回退到 `apiBase` */
+			siteUrl: '',
+			/** GitHub 扩展卡是否实时拉取仓库信息（star / fork / 描述）；关闭后只显示 owner/repo */
+			githubLive: true,
+			/**
+			 * 推文扩展卡的渲染方式
+			 * - `static`：纯静态卡（@用户名 + 打开原推），不加载任何第三方脚本；
+			 * - `embed` ：加载 platform.twitter.com/widgets.js 渲染真推文（国内网络常不可达）
+			 */
+			tweetMode: 'static' as 'static' | 'embed',
+			/** 定位扩展卡是否允许点击展开 OpenStreetMap 地图 */
+			locationMap: true,
 		},
 	},
 

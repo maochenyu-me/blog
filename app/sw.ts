@@ -6,6 +6,7 @@ import { cleanupOutdatedCaches, precacheAndRoute, PrecacheFallbackPlugin } from 
 import { RangeRequestsPlugin } from 'workbox-range-requests'
 import { registerRoute } from 'workbox-routing'
 import { CacheFirst, NetworkFirst, NetworkOnly, StaleWhileRevalidate } from 'workbox-strategies'
+import blogConfig from '~~/blog.config'
 
 declare let self: ServiceWorkerGlobalScope
 
@@ -108,6 +109,12 @@ registerRoute(
 /**
  * 第三方 API（域名与 `blog.config.ts` 的 memos / hot / comment / meting / netease 一致）。
  * 它们自身已有 localStorage 缓存与刷新策略，SW 不再插一层写出第二套过期逻辑。
+ *
+ * 说说页的 Ech0 实例**刻意**从配置里 import 而不是写死字符串：换实例时只改一处。
+ * 代价是 blog.config 的对象字面量会整段内联进 SW（约 +4KB，构建期常量，无运行时开销），
+ * 这比「复制一份域名到这里、改配置时忘记同步」安全，勿当作冗余裁掉。
+ * 它同时承载附件静态资源 `/api/files/**`，这些大文件同样交给 NetworkOnly 直连 ——
+ * 离线时说说本身走 localStorage 首屏缓存，附件取不到属预期。
  */
 const API_ORIGINS = new Set([
 	'https://ecoku.518339.xyz',
@@ -115,6 +122,7 @@ const API_ORIGINS = new Set([
 	'https://hot-api.liiiu.cn',
 	'https://meting.081531.xyz',
 	'https://netease.518339.xyz',
+	new URL(blogConfig.memos.ech0.apiBase).origin,
 ])
 
 registerRoute(

@@ -2,9 +2,12 @@
 const appConfig = useAppConfig()
 const banner = appConfig.memos.banner
 
+/** 描述文案跟随数据源，别在 ech0 源下还写着 Telegram */
+const sourceLabel = computed(() => (appConfig.memos.source === 'tg' ? 'Telegram 频道' : 'Ech0'))
+
 useSeoMeta({
 	title: '说说',
-	description: `${appConfig.title}的说说页面，收录 Telegram 频道里的日常碎片与随想。`,
+	description: () => `${appConfig.title}的说说页面，收录 ${sourceLabel.value} 里的日常碎片与随想。`,
 })
 </script>
 
