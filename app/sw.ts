@@ -231,3 +231,25 @@ registerRoute(
 	({ url }) => API_ORIGINS.has(url.origin),
 	new NetworkOnly(),
 )
+
+/**
+ * 评论验证码（Cap widget）的静态资源：**必须由 SW 接管，不能落到浏览器 HTTP 缓存**。
+ *
+ * 背景：Ecoku 的验证码实例地址是服务端 `/api/config` 动态下发的（当前是 cap.518339.xyz），
+ * 前端无法在构建期枚举，所以没法写进 `API_ORIGINS`。而它加载的 `cap_wasm_bg.wasm`
+ * 一旦在浏览器磁盘缓存里损坏，就会一直报 `ERR_CACHE_READ_FAILURE`，
+ * 导致验证码渲染不出来、**评论发不出去**——用户看到的就是「评论功能坏了」。
+ *
+ * 这里按**路径特征**匹配（`/assets/widget.js`、`/assets/cap_wasm_bg.wasm`、
+ * `/assets/pako_inflate.min.js`），与具体域名无关，换实例也不用改这里。
+ * 走 NetworkOnly：由 SW 直连网络，绕开损坏的磁盘缓存条目。
+ * 验证码本来就必须联网求解，缓存它没有意义。
+ */
+const CAP_ASSET_PATTERN = /^\/assets\/(?:widget\.js|cap_wasm_bg\.wasm|pako_inflate\.min\.js)$/
+
+registerRoute(
+	// 跨域 + 路径特征双条件：只接管第三方验证码服务的这三个固定资源，
+	// 不碰任何同源路径（本站没有 /assets/ 目录，但也不给自己留误伤的余地）
+	({ url, sameOrigin }) => !sameOrigin && CAP_ASSET_PATTERN.test(url.pathname),
+	new NetworkOnly(),
+)
