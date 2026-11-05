@@ -208,6 +208,82 @@ pnpm-workspace.yaml   # pnpm catalogs
 
 - `.output/public` 下不再有独立的 `workbox-*.js`（运行时已内联进 `sw.js`，单文件约 46 KB）。
 
+## 说说页面（数据源：tg / ech0）
+
+说说页（`app/pages/memos.vue`）的取数与渲染是**完全解耦**的：`blog.config.ts` 的 `memos.source` 二选一，两个适配器对外暴露同一套状态，`MemosTimeline.vue` / `MemosCard.vue` 只处理统一的 `MemosMessage`。
+
+| 层 | 位置 | 说明 |
+| --- | --- | --- |
+| 门面 | `app/composables/useMemos.ts` | 按 `memos.source` 选适配器；同时导出 `formatMemosFileSize` / `formatMemosDuration`（组件自动导入） |
+| tg 适配器 | `app/composables/memos/useMemosTg.ts` | koharu-suite，**游标**分页（`nextCursor`） |
+| ech0 适配器 | `app/composables/memos/useMemosEch0.ts` | 自部署 Ech0，**页码**分页（`page` + `total`） |
+| 视图模型 | `app/types/memos.ts` | 统一 `MemosMessage`（`source` / `html` / `plainText` / `extension` / `favCount`） |
+| ech0 原始类型 | `app/types/memos-ech0.ts` | 后端带 `omitempty`，字段一律可选 |
+| 映射（纯函数） | `app/utils/memos/ech0.ts` | 原始 → 视图模型，`node --test` 覆盖 |
+| Markdown | `app/utils/memos/markdown.ts` | **懒加载** `markdown-it`，`html:false` |
+| 纯文本/标签 | `app/utils/memos/plain.ts` | 引用评论用纯文本 + 剥裸 `#标签` |
+| 音乐解析 | `app/utils/memos/music.ts` | 音乐**分享页 URL** → `{server,type,id}` → Meting |
+| 扩展卡片 | `app/components/memos/MemosExt*.vue` | Shell + 6 类卡（music/video/github/website/tweet/location），全部异步加载 |
+| 构建期快照 | `server/api/memos/latest.get.ts` | 按 `memos.source` 分支，两个源返回各自原始形态 |
+
+**配置要点**
+
+- 共用项在 `memos` 顶层：`perPage` / `cacheTtl` / `refreshInterval` / `requestTimeout` / `avatar` / `nickname` / `banner`。
+- `memos.tg`：`apiBase`（koharu-suite）、`channelIds`。
+- `memos.ech0`：`apiBase`、`siteUrl`（留空回退 apiBase，用于「查看原帖」）、`githubLive`（关掉后 GitHub 卡只显示 owner/repo，不打 api.github.com）、`tweetMode`（`static` / `embed`）、`locationMap`。
+- 代码保留 `config.tg ?? config.apiBase` 的旧配置兼容读取。
+
+**ech0 接口契约**（实测 v1.0.3 / commit `086219b`，与本地 `E:\kmoretti-github\Ech0` HEAD 一致）
+
+```text
+POST {apiBase}/api/echo/query   body {page, pageSize}
+→ {code:1, msg, data:{total, items}}
+```
+
+- `page` 从 1 开始；`pageSize` 上限 **100**，超出静默截断；`page=0` 静默回落 1。
+- 匿名请求服务端强制过滤 `private`，公开页不需要也不该做私密筛选。
+- `content` 是 **Markdown 源码**（不是 HTML），`created_at` 是 **Unix 秒**。
+- `echo_files` / `tags` / `username` / `extension` / `layout` 带 `omitempty`，**字段可能整块缺失**。
+- `echo_files[].file.url` 可能是相对路径 `/api/files/...`，映射时统一拼实例域名。
+- 附件**没有 duration**，音视频时长由播放器 `loadedmetadata` 自己读。
+- CORS **完全放开**（反射任意 Origin），浏览器可直连 → **不需要开发代理**（与 tg 不同）。
+- 附件静态目录 `/api/files/**` **不带 CORS 头**（注册在 CORS 中间件之前）→ 只能用 `<img>/<video>/<audio>` 标签，不能 `fetch()` 读字节。
+
+**扩展卡片**
+
+| type | payload | 渲染 |
+| --- | --- | --- |
+| `MUSIC` | `{url}` 音乐分享页 | 解析出 id → Meting 取元信息/音频/封面，卡片内联播放器（页内互斥）；Apple 不被 Meting 支持 → 外链卡 |
+| `VIDEO` | `{videoId}` | `BV` 前缀 → Bilibili iframe，否则 YouTube |
+| `GITHUBPROJ` | `{repoUrl}` | 实时打 `api.github.com`，localStorage 缓存 24h，失败降级静态 |
+| `WEBSITE` | `{title,site}` | 标题 + 域名 |
+| `LOCATION` | `{placeholder,latitude,longitude}` | 地名 + 坐标，点击才创建 OSM embed iframe |
+| `TWEET` | `{url,username,statusId}` | 默认纯静态卡（不加载 widgets.js） |
+
+**音乐前提**：`payload.url` 存的是分享页，播放要二次请求 Meting（`blogConfig.music.meting.api`）。**无 cookie 的 meting 实例对 VIP 歌曲会 302 到网易云的 404 页**（实测 186016 晴天失败、347230 等免费曲成功），所以卡片必须容错：播不了就显示「音源暂不可用（版权限制）」，不能让整张卡消失。
+
+**URL 安全（必须遵守）**：`extension.payload` 是服务端自由 JSON，而 **Vue 的 `:href` 绑定不做协议净化**（`javascript:` 黑名单只在 compiler-dom 对模板字面量的检查里）。所以：
+
+- 任何来自接口的链接一律先过 `app/utils/memos/url.ts` 的 `safeHttpUrl()`；GitHub 地址用 `safeGithubRepoUrl()` 再加 hostname 白名单。
+- `MemosExtShell.vue` 已统一兜住右上「前往」链接，各卡内部的 `<a>` 必须自己再过一遍（GitHub / Tweet 卡已做）。
+- 非法地址的降级是**不渲染链接**（渲成纯文本卡），不是留一个 `href=""`。
+- `url.test.ts`（11 条用例）是这条防线的回归测试，改动这些卡时先跑它。
+
+**标签取值**：`collectTags()` 取「结构化 `tags` ∪ 正文裸 hashtag」的并集。**不要改回「有 tags 就只看 tags」**：实测 47 条里 26 条的结构化 tags 只有 Ech0 自动打的全站标签（`kemiaoshuoshuo`），作者的真实分类只写在正文里，而正文标签又会在渲染前被剥掉。
+
+**开发期造数据**：线上 ech0 没有 MUSIC/VIDEO/TWEET 扩展与附件，用 `http://localhost:3000/memos?memos-mock=1` 注入 `app/data/memos-ech0-mock.ts`。mock 模式下**跳过 localStorage 缓存**，改数据立刻生效。生产产物校验：`grep -rl "mock-01-longform" .output/public/_nuxt/` 应为空。
+
+> ⚠️ 这里踩过一次坑：`import.meta.dev` 若写在 `computed()` 里，Rollup 折叠成 `false` 后仍会保留动态 `import()` 的调用点，mock 数据会被当成独立 chunk 打进生产产物。必须像 `loadMockPage()` 那样用**分支外的普通 `if (!import.meta.dev) return null`**，让整个 import 不可达。
+
+**测试**：`node --test "app/utils/**/*.test.ts"`（已并入 `pnpm test`）。`app/**/*.test.ts` 在 `eslint.config.mjs` 里显式关闭了 `test/no-import-node-test`，沿用仓库「零依赖、跑 Node 内置 test runner」的约定。
+
+**两个已知坑**
+
+1. `useRoute()` 必须在 **setup 同步阶段**取一次再给异步回调用；在 `await` 之后的回调里再调会丢 Nuxt 上下文，异常还会被适配器的 `catch` 吞掉，表现成「mock 不生效但页面正常显示旧数据」。
+2. 改这些文件时 dev server 的 chokidar 偶发 `EBUSY`（编辑器原子写产生的 `*.tmpdir/` 被监听）导致 Nuxt 自重启甚至 500：编辑前先停 dev server，或改完重启一次再验收。
+
+---
+
 ## 工具链约定
 
 - **pnpm catalogs**：`pnpm-workspace.yaml` 将依赖按 `ui` / `content` / `framework` / `util` / `quality` 分组，`package.json` 用 `catalog:xxx` 引用。升级依赖走 `pnpm bump` 或 `nip`。
