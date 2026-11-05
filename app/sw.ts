@@ -233,23 +233,58 @@ registerRoute(
 )
 
 /**
- * 评论验证码（Cap widget）的静态资源：**必须由 SW 接管，不能落到浏览器 HTTP 缓存**。
+ * 评论验证码（Cap）服务：**整个域名都由 SW 接管，不落浏览器 HTTP 缓存**。
  *
- * 背景：Ecoku 的验证码实例地址是服务端 `/api/config` 动态下发的（当前是 cap.518339.xyz），
- * 前端无法在构建期枚举，所以没法写进 `API_ORIGINS`。而它加载的 `cap_wasm_bg.wasm`
- * 一旦在浏览器磁盘缓存里损坏，就会一直报 `ERR_CACHE_READ_FAILURE`，
- * 导致验证码渲染不出来、**评论发不出去**——用户看到的就是「评论功能坏了」。
+ * Cap 是 Ecoku 评论的人机验证服务，一个独立域名（当前是 cap.518339.xyz），负责两步：
+ *   1. `/assets/widget.js` + `/assets/cap_wasm_bg.wasm` + `/assets/pako_inflate.min.js` —— 渲染验证控件
+ *   2. `<sitekey>/challenge` 等 API —— 取题、答题、换 token
+ * 它的实例地址由 Ecoku 服务端下发，**前端构建期拿不到**，所以没法写进 `API_ORIGINS`。
  *
- * 这里按**路径特征**匹配（`/assets/widget.js`、`/assets/cap_wasm_bg.wasm`、
- * `/assets/pako_inflate.min.js`），与具体域名无关，换实例也不用改这里。
- * 走 NetworkOnly：由 SW 直连网络，绕开损坏的磁盘缓存条目。
- * 验证码本来就必须联网求解，缓存它没有意义。
+ * 为什么必须接管：这些资源一旦在浏览器磁盘缓存里坏掉，就持续报 `ERR_CACHE_READ_FAILURE`，
+ * 验证控件渲染不出来 → **评论发不出去**（线上真实发生过）。而 Workbox 的运行时路由
+ * 只管自己写进 Cache Storage 的条目，管不到浏览器 HTTP 磁盘缓存；只有让请求经过 SW、
+ * 用 NetworkOnly 直连网络，才能绕开坏条目。
+ *
+ * 匹配方式：**按域名特征**（host 以 `cap.` 开头，或路径落在 `/assets/cap_wasm_bg.wasm`），
+ * 不写死具体域名 —— 换验证码实例时不用改代码。验证码必须实时联网求解，缓存它没有意义，
+ * 所以 NetworkOnly 是正确策略，不存在「离线时验证码不可用」的额外损失（本来也不可用）。
  */
-const CAP_ASSET_PATTERN = /^\/assets\/(?:widget\.js|cap_wasm_bg\.wasm|pako_inflate\.min\.js)$/
+const CAP_HOST_PATTERN = /^cap\./i
+const CAP_ASSET_HINT = /^\/assets\/(?:cap_wasm_bg\.wasm|pako_inflate\.min\.js|widget\.js)$/
+
+/**
+ * 验证码实例的主机是否落在「自有域族」里。
+ * 用 Ecoku 实例域名反推父域（`ecoku.518339.xyz` → `518339.xyz`），
+ * 这样只接管「cap.自有域」的请求，不会误伤其他站点碰巧叫 `cap.*` 的资源，
+ * 也不写死具体主机名 —— 验证码换实例时只要还在同一域族下，代码不用动。
+ */
+const OWN_PARENT_DOMAIN = (() => {
+	try {
+		const parts = new URL(blogConfig.comment.ecoku.serverURL).hostname.split('.')
+		return parts.length > 1 ? parts.slice(1).join('.') : ''
+	}
+	catch {
+		return ''
+	}
+})()
+
+function isOwnedCapHost(hostname: string) {
+	if (!CAP_HOST_PATTERN.test(hostname))
+		return false
+	return !!OWN_PARENT_DOMAIN && hostname.endsWith(`.${OWN_PARENT_DOMAIN}`)
+}
 
 registerRoute(
-	// 跨域 + 路径特征双条件：只接管第三方验证码服务的这三个固定资源，
-	// 不碰任何同源路径（本站没有 /assets/ 目录，但也不给自己留误伤的余地）
-	({ url, sameOrigin }) => !sameOrigin && CAP_ASSET_PATTERN.test(url.pathname),
+	({ url, sameOrigin }) => {
+		// 不碰任何同源请求：本站没有 /assets/ 目录，也不给自己留误伤余地
+		if (sameOrigin)
+			return false
+		// 自己的验证码实例：整域接管（静态资源 + challenge API 都绕过磁盘缓存）
+		if (isOwnedCapHost(url.hostname))
+			return true
+		// 兜底：万一把验证码挪到了别的域，至少控件本体与 wasm 仍走 SW
+		// （只要页面受本 SW 控制，跨域资源请求同样会经过 fetch 事件）
+		return CAP_ASSET_HINT.test(url.pathname)
+	},
 	new NetworkOnly(),
 )
