@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-06T22:34:37.848Z",
+  "generatedAt": "2026-11-07T21:15:29.524Z",
   "sites": [
     {
       "id": "blog.zhilu.site",
@@ -30,7 +30,7 @@
           "cover": "https://assets.zhilu.cyou/cover6/buy-right.webp"
         }
       ],
-      "fetchedAt": "2026-11-06T22:34:37.848Z"
+      "fetchedAt": "2026-11-07T21:15:29.524Z"
     },
     {
       "id": "blog.liushen.fun",
@@ -102,7 +102,7 @@
           "date": "2026-01-07T16:06:00.000Z"
         }
       ],
-      "fetchedAt": "2026-11-06T22:34:37.848Z"
+      "fetchedAt": "2026-11-07T21:15:29.524Z"
     }
   ]
 }
