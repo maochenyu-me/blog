@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-21T22:38:19.423Z",
+  "generatedAt": "2026-11-22T23:00:39.164Z",
   "sites": [
     {
       "id": "blog.zhilu.site",
@@ -10,6 +10,12 @@
       "feed": "https://blog.zhilu.site/atom.xml",
       "status": "ok",
       "items": [
+        {
+          "title": "我的macOS与AI环境配置偏好",
+          "link": "https://blog.zhilu.site/2026/macos-ai-setup",
+          "excerpt": "记录我的macOS环境配置，包括终端、Coding Agent和实用软件。",
+          "date": "2026-11-22T10:36:58.000Z"
+        },
         {
           "title": "不在大学",
           "link": "https://blog.zhilu.site/2026/out-of-campus",
@@ -30,7 +36,7 @@
           "cover": "https://assets.zhilu.cyou/cover6/buy-right.webp"
         }
       ],
-      "fetchedAt": "2026-11-21T22:38:19.423Z"
+      "fetchedAt": "2026-11-22T23:00:39.164Z"
     },
     {
       "id": "blog.liushen.fun",
@@ -102,7 +108,7 @@
           "date": "2026-02-22T12:31:00.000Z"
         }
       ],
-      "fetchedAt": "2026-11-21T22:38:19.423Z"
+      "fetchedAt": "2026-11-22T23:00:39.164Z"
     }
   ]
 }
